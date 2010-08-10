@@ -138,8 +138,8 @@ struct ucred {
 #define AF_LLC 26  
 #define AF_TIPC 30  
 #define AF_BLUETOOTH 31  
-#define AF_CAIF 38  
-#define AF_MAX 39  
+#define AF_CAIF 37  
+#define AF_MAX 38  
 
 #define PF_UNSPEC AF_UNSPEC
 #define PF_UNIX AF_UNIX
@@ -222,6 +222,7 @@ struct ucred {
 #define SOL_DCCP 269
 #define SOL_NETLINK 270
 #define SOL_TIPC 271
+#define SOL_CAIF 278
 
 #define IPX_TYPE 1
 
