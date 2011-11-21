@@ -48,6 +48,17 @@ int  fork(void)
         __timer_table_start_stop(0);
         __bionic_atfork_run_parent();
     } else {
+#ifdef OMAP_ENCHANCEMENT
+        /* If the parent process is multi-threaded, then we can only
+         * call async-signal-safe operations until the child process
+         * calls one of the exec() methods.  In bionic, it is known
+         * that free() and malloc() are not safe to call and will
+         * cause deadlocks (because one of the discontinued threads
+         * may have had the heap locked).  By extension fprintf(),
+         * fwrite(), fputc(), and putc() are not safe because they
+         * are known to call malloc().
+         */
+#endif
         /*
          * Newly created process must update cpu accounting.
          * Call cpuacct_add passing in our uid, which will take

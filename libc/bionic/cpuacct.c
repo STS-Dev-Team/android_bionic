@@ -29,17 +29,39 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/stat.h>
+#ifdef OMAP_ENHANCEMENT
+#include <sys/types.h>
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 #include "cpuacct.h"
 
+#ifdef OMAP_ENHANCEMENT
+/* WARNING:
+ * cpuacct_add() is called from inside fork(), and therefore must only
+ * call async-signal-safe operations.  See fork.c for details.
+ */
+#endif
 int cpuacct_add(uid_t uid)
 {
     int count;
+#ifdef OMAP_ENHANCEMENT
+    int fd;
+    char zero[] = "0";
+#else
     FILE *fp;
+#endif
     char buf[80];
 
     count = snprintf(buf, sizeof(buf), "/acct/uid/%d/tasks", uid);
+
+#ifdef OMAP_ENHANCEMENT
+    fd = open(buf, O_RDWR | O_CREAT);
+    if (fd < 0) {
+#else
     fp = fopen(buf, "w+");
     if (!fp) {
+#endif
         /* Note: sizeof("tasks") returns 6, which includes the NULL char */
         buf[count - sizeof("tasks")] = 0;
         if (mkdir(buf, 0775) < 0)
@@ -47,14 +69,29 @@ int cpuacct_add(uid_t uid)
 
         /* Note: sizeof("tasks") returns 6, which includes the NULL char */
         buf[count - sizeof("tasks")] = '/';
+#ifdef OMAP_ENHANCEMENT
+        fd = open(buf, O_RDWR | O_CREAT);
+#else
         fp = fopen(buf, "w+");
+#endif
     }
+#ifdef OMAP_ENHANCEMENT
+    if (fd < 0)
+        return -errno;
+#else
     if (!fp)
         return -errno;
+#endif
 
+#ifdef OMAP_ENHANCEMENT
+    write(fd, zero, sizeof(zero));
+    if (close(fd))
+        return -errno;
+#else
     fprintf(fp, "0");
     if (fclose(fp))
         return -errno;
+#endif
 
     return 0;
 }
