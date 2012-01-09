@@ -34,9 +34,21 @@
         .text
         .fpu    neon
 
+#ifdef OMAP_ENHANCEMENT
+#if defined(HAVE_32_BYTE_CACHE_LINE) && defined(TARGET_OMAP4)
+/* a prefetch distance of 4 cache-lines works best experimentally */
+#define CACHE_LINE_SIZE     32
+#define PREFETCH_DISTANCE   (CACHE_LINE_SIZE*4)
+#else
 /* a prefetch distance of 4 cache-lines works best experimentally */
 #define CACHE_LINE_SIZE     64
 #define PREFETCH_DISTANCE   (CACHE_LINE_SIZE*4)
+#endif
+#else
+/* a prefetch distance of 4 cache-lines works best experimentally */
+#define CACHE_LINE_SIZE     64
+#define PREFETCH_DISTANCE   (CACHE_LINE_SIZE*4)
+#endif//OMAP_ENHANCEMENT
 
 ENTRY(memcpy)
         .save       {r0, lr}
@@ -83,20 +95,45 @@ ENTRY(memcpy)
         subs        r2, r2, #64
         blo         2f
 
+#ifdef OMAP_ENHANCEMENT
+#ifdef TARGET_OMAP4
+        DSB       /* reset A9 BIU for early write alloc suppression */
+#endif
+#endif//OMAP_ENHANCEMENT
         /* preload all the cache lines we need.
          * NOTE: the number of pld below depends on PREFETCH_DISTANCE,
          * ideally would would increase the distance in the main loop to
          * avoid the goofy code below. In practice this doesn't seem to make
          * a big difference.
          */
+#ifdef OMAP_ENHANCEMENT
+#if defined(HAVE_32_BYTE_CACHE_LINE) && defined(TARGET_OMAP4)
+        //At this point we have preloaded 128 bytes of src data
+        //Adding additioanl plds here slows down throughput for < 4096 byte copy
+        //(Observed in OMAP4460 and OMAP4470)
         pld         [r1, #(CACHE_LINE_SIZE*2)]
         pld         [r1, #(CACHE_LINE_SIZE*3)]
         pld         [r1, #(PREFETCH_DISTANCE)]
-
+        pld         [r1, #(PREFETCH_DISTANCE + CACHE_LINE_SIZE)]
+#else
+        pld         [r1, #(CACHE_LINE_SIZE*2)]
+        pld         [r1, #(CACHE_LINE_SIZE*3)]
+        pld         [r1, #(PREFETCH_DISTANCE)]
+#endif
+#else
+        pld         [r1, #(CACHE_LINE_SIZE*2)]
+        pld         [r1, #(CACHE_LINE_SIZE*3)]
+        pld         [r1, #(PREFETCH_DISTANCE)]
+#endif//OMAP_ENHANCEMENT
 1:      /* The main loop copies 64 bytes at a time */
         vld1.8      {d0  - d3},   [r1]!
         vld1.8      {d4  - d7},   [r1]!
         pld         [r1, #(PREFETCH_DISTANCE)]
+#ifdef OMAP_ENHANCEMENT
+#if defined(HAVE_32_BYTE_CACHE_LINE) && defined(TARGET_OMAP4)
+        pld         [r1, #(PREFETCH_DISTANCE + CACHE_LINE_SIZE)]
+#endif
+#endif//OMAP_ENHANCEMENT
         subs        r2, r2, #64
         vst1.8      {d0  - d3},   [r0, :128]!
         vst1.8      {d4  - d7},   [r0, :128]!

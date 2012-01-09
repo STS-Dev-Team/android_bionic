@@ -483,6 +483,15 @@ libc_common_cflags := \
 		-DPOSIX_MISTAKE \
                 -DLOG_ON_HEAP_ERROR \
 
+ifeq ($(OMAP_ENHANCEMENT),true)
+# Define HAVE_32_BYTE_CACHE_LINES to indicate to C
+# library it should use to 32-byte version of memcpy, and not
+# the 64-byte version.
+ifeq ($(ARCH_ARM_HAVE_32_BYTE_CACHE_LINES),true)
+   libc_common_cflags += -DHAVE_32_BYTE_CACHE_LINE
+endif
+endif
+
 # these macro definitions are required to implement the
 # 'timezone' and 'daylight' global variables, as well as
 # properly update the 'tm_gmtoff' field in 'struct tm'.
