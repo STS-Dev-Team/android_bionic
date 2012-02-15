@@ -18,24 +18,28 @@
  ****************************************************************************/
 #ifndef _LINUX_OMAP_HWC_H
 #define _LINUX_OMAP_HWC_H
+#define HWC_BLT_DESC_FLAG 0x80000000
+#define HWC_BLT_DESC_FB 0x40000000
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+#define HWC_BLT_DESC_FB_FN(ovlno)   (HWC_BLT_DESC_FLAG | HWC_BLT_DESC_FB | (ovlno))
 struct rgz_blt_entry {
  struct bvbltparams bp;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
  struct bvsurfgeom dstgeom;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
  struct bvsurfgeom src1geom;
  struct bvbuffdesc src1desc;
  struct bvsurfgeom src2geom;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
  struct bvbuffdesc src2desc;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
 struct omap_hwc_blit_data {
  __u16 rgz_items;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
  struct rgz_blt_entry rgz_blts[0];
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
 struct omap_hwc_data {
  struct dsscomp_setup_dispc_data dsscomp_data;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
  struct omap_hwc_blit_data blit_data;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
 #endif
