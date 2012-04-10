@@ -22,24 +22,28 @@
 #define HWC_BLT_DESC_FB 0x40000000
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 #define HWC_BLT_DESC_FB_FN(ovlno)   (HWC_BLT_DESC_FLAG | HWC_BLT_DESC_FB | (ovlno))
+#define HWC_BLT_FLAG_USE_FB (1 << 0)
 struct rgz_blt_entry {
  struct bvbltparams bp;
- struct bvsurfgeom dstgeom;
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ struct bvsurfgeom dstgeom;
  struct bvsurfgeom src1geom;
  struct bvbuffdesc src1desc;
  struct bvsurfgeom src2geom;
- struct bvbuffdesc src2desc;
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ struct bvbuffdesc src2desc;
 };
 struct omap_hwc_blit_data {
+ __u16 rgz_flags;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
  __u16 rgz_items;
  struct rgz_blt_entry rgz_blts[0];
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
 struct omap_hwc_data {
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
  struct dsscomp_setup_dispc_data dsscomp_data;
  struct omap_hwc_blit_data blit_data;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
 #endif
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+
