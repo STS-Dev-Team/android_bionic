@@ -16,25 +16,27 @@
  ***
  ****************************************************************************
  ****************************************************************************/
-#ifndef BVENTRY_H
-#define BVENTRY_H
+#ifndef BVCACHE_H_
+#define BVCACHE_H_
 struct bvbuffdesc;
-struct bvbltparams;
+struct bvsurfgeom;
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-struct bvcopparams;
-typedef enum bverror (*BVFN_MAP) (struct bvbuffdesc *buffdesc);
-typedef enum bverror (*BVFN_UNMAP) (struct bvbuffdesc *buffdesc);
-typedef enum bverror (*BVFN_BLT) (struct bvbltparams *bltparams);
+struct bvrect;
+enum bvcacheop {
+ BVCACHE_BIDIRECTIONAL = 0,
+ BVCACHE_CPU_TO_DEVICE = 1,
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-typedef enum bverror (*BVFN_CACHE)(struct bvcopparams *copparams);
-struct bventry {
- unsigned int structsize;
- BVFN_MAP bv_map;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- BVFN_UNMAP bv_unmap;
- BVFN_BLT bv_blt;
- BVFN_CACHE bv_cache;
+ BVCACHE_CPU_FROM_DEVICE = 2,
+ BVCACHE_RESERVED3 = 3,
 };
+struct bvcopparams {
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ unsigned int structsize;
+ struct bvbuffdesc *desc;
+ struct bvsurfgeom *geom;
+ struct bvrect *rect;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ enum bvcacheop cacheop;
+};
 #endif
 
