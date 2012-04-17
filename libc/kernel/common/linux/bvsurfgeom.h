@@ -29,7 +29,7 @@ struct bvsurfgeom {
  long virtstride;
  enum ocdformat paletteformat;
  void *palette;
- long physstride;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 #endif
+
