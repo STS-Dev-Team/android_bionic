@@ -33,28 +33,33 @@ enum ion_heap_type {
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 #define ION_HEAP_SYSTEM_CONTIG_MASK (1 << ION_HEAP_TYPE_SYSTEM_CONTIG)
 #define ION_HEAP_CARVEOUT_MASK (1 << ION_HEAP_TYPE_CARVEOUT)
-#define ION_FLAG_CACHED 1  
 struct ion_allocation_data {
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
  size_t len;
- size_t align;
- unsigned int heap_mask;
- unsigned int flags;
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ size_t align;
+ unsigned int flags;
  struct ion_handle *handle;
 };
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 struct ion_fd_data {
  struct ion_handle *handle;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
  int fd;
+ unsigned char cacheable;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
 struct ion_handle_data {
  struct ion_handle *handle;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 struct ion_custom_data {
  unsigned int cmd;
  unsigned long arg;
+};
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+struct ion_cached_user_buf_data {
+ struct ion_handle *handle;
+ unsigned long vaddr;
+ size_t size;
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
 #define ION_IOC_MAGIC 'I'
@@ -66,5 +71,7 @@ struct ion_custom_data {
 #define ION_IOC_IMPORT _IOWR(ION_IOC_MAGIC, 5, int)
 #define ION_IOC_CUSTOM _IOWR(ION_IOC_MAGIC, 6, struct ion_custom_data)
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+#define ION_IOC_FLUSH_CACHED _IOWR(ION_IOC_MAGIC, 7,   struct ion_cached_user_buf_data)
+#define ION_IOC_INVAL_CACHED _IOWR(ION_IOC_MAGIC, 8,   struct ion_cached_user_buf_data)
 #endif
 
