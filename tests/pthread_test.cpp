@@ -14,21 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef LIBC_BIONIC_DLMALLOC_H_
-#define LIBC_BIONIC_DLMALLOC_H_
+#include <gtest/gtest.h>
 
-/* Configure dlmalloc. */
-#define HAVE_GETPAGESIZE 1
-#define MALLOC_INSPECT_ALL 1
-#define MSPACES 0
-#define REALLOC_ZERO_BYTES_FREES 1
-#define USE_DL_PREFIX 1
-#define USE_LOCKS 1
-#define LOCK_AT_FORK 1
-#define USE_RECURSIVE_LOCK 0
-#define USE_SPIN_LOCKS 0
+#include <errno.h>
+#include <pthread.h>
 
-/* Include the proper definitions. */
-#include "../upstream-dlmalloc/malloc.h"
-
-#endif  // LIBC_BIONIC_DLMALLOC_H_
+TEST(pthread, pthread_key_create) {
+  pthread_key_t key;
+  ASSERT_EQ(0, pthread_key_create(&key, NULL));
+  ASSERT_EQ(0, pthread_key_delete(key));
+  // Can't delete a key that's already been deleted.
+  ASSERT_EQ(EINVAL, pthread_key_delete(key));
+}
