@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2012 The Android Open Source Project
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,35 +26,34 @@
  * SUCH DAMAGE.
  */
 
-/*
- * The MIPS pipe syscall returns results in two registers, which
- * we have to copy into the supplied array. This prevents us from
- * using an auto-generated stub.
- */
+#ifndef _BIONIC_THREAD_LOCAL_BUFFER_H_included
+#define _BIONIC_THREAD_LOCAL_BUFFER_H_included
 
-#include <asm/unistd.h>
+#include <malloc.h>
+#include <pthread.h>
 
-	.text
+// libstdc++ currently contains __cxa_guard_acquire and __cxa_guard_release,
+// so we make do with macros instead of a C++ class.
+// TODO: move __cxa_guard_acquire and __cxa_guard_release into libc.
 
-/* int pipe(int[]) */
+#define GLOBAL_INIT_THREAD_LOCAL_BUFFER(name) \
+  static pthread_once_t name ## _once; \
+  static pthread_key_t name ## _key; \
+  static void name ## _key_destroy(void* buffer) { \
+    free(buffer); \
+  } \
+  static void name ## _key_init() { \
+    pthread_key_create(&name ## _key, name ## _key_destroy); \
+  }
 
-	.type	pipe,@function
-	.global	pipe
-	.align	4
-	.ent	pipe
-pipe:
-	.set	noreorder
-	.cpload	$t9
-	li	$v0,__NR_pipe
-	syscall			/* syscall returns results in v0,v1 */
-	bnez	$a3, 1f		/* check errno */
-	 nop
-	sw	$v0, 0($a0)
-	sw	$v1, 4($a0)
-	j	$ra
-	 move	$v0, $zero
-1:
-	la	$t9, __set_errno
-	j	$t9
-	 move    $a0, $v0	/* delay slot, prepare args for __set_errno */
-	.end	pipe
+// Leaves "name_buffer" and "name_byte_count" defined and initialized.
+#define LOCAL_INIT_THREAD_LOCAL_BUFFER(type, name, byte_count) \
+  pthread_once(&name ## _once, name ## _key_init); \
+  type name ## _buffer = reinterpret_cast<type>(pthread_getspecific(name ## _key)); \
+  if (name ## _buffer == NULL) { \
+    name ## _buffer = reinterpret_cast<type>(malloc(byte_count)); \
+    pthread_setspecific(name ## _key, name ## _buffer); \
+  } \
+  const size_t name ## _buffer_size = byte_count
+
+#endif // _BIONIC_THREAD_LOCAL_BUFFER_H_included
