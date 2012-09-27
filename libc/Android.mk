@@ -123,7 +123,6 @@ libc_common_src_files := \
 	stdio/sscanf.c \
 	stdio/stdio.c \
 	stdio/tempnam.c \
-	stdio/tmpfile.c \
 	stdio/tmpnam.c \
 	stdio/ungetc.c \
 	stdio/vasprintf.c \
@@ -257,6 +256,7 @@ libc_common_src_files := \
 	tzcode/strftime.c \
 	tzcode/strptime.c \
 	bionic/__set_errno.c \
+	bionic/__umask_chk.c \
 	bionic/bionic_clone.c \
 	bionic/cpuacct.c \
 	bionic/arc4random.c \
@@ -296,6 +296,7 @@ libc_common_src_files := \
 	bionic/tdestroy.c \
 	bionic/time64.c \
 	bionic/thread_atexit.c \
+	bionic/tmpfile.cpp \
 	bionic/utime.c \
 	bionic/utmp.c \
 	netbsd/gethnamaddr.c \

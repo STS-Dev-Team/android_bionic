@@ -14,15 +14,35 @@
  * limitations under the License.
  */
 
-#ifndef _BIONIC_NETBSD_EXTERN_H_included
-#define _BIONIC_NETBSD_EXTERN_H_included
+#include <gtest/gtest.h>
 
-#include <sys/cdefs.h>
+#include <errno.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
-__BEGIN_DECLS
+TEST(stdio, tmpfile_fileno_fprintf_rewind_fgets) {
+  FILE* fp = tmpfile();
+  ASSERT_TRUE(fp != NULL);
 
-const char* __strsignal(int, char*, size_t);
+  int fd = fileno(fp);
+  ASSERT_NE(fd, -1);
 
-__END_DECLS
+  struct stat sb;
+  int rc = fstat(fd, &sb);
+  ASSERT_NE(rc, -1);
+  ASSERT_EQ(sb.st_mode & 0777, 0600U);
 
-#endif
+  rc = fprintf(fp, "hello\n");
+  ASSERT_EQ(rc, 6);
+
+  rewind(fp);
+
+  char buf[16];
+  char* s = fgets(buf, sizeof(buf), fp);
+  ASSERT_TRUE(s != NULL);
+  ASSERT_STREQ("hello\n", s);
+
+  fclose(fp);
+}
