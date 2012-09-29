@@ -60,6 +60,11 @@
 typedef	unsigned long    size_t;
 #endif
 
+#ifndef _SSIZE_T_DEFINED_
+#define _SSIZE_T_DEFINED_
+typedef long int  ssize_t;
+#endif
+
 #ifndef	_OFF_T_DEFINED_
 #define	_OFF_T_DEFINED_
 typedef	long    off_t;
@@ -249,6 +254,9 @@ off_t	 ftello(FILE *);
 size_t	 fwrite(const void *, size_t, size_t, FILE *);
 int	 getc(FILE *);
 int	 getchar(void);
+ssize_t	 getdelim(char ** __restrict, size_t * __restrict, int,
+	    FILE * __restrict);
+ssize_t	 getline(char ** __restrict, size_t * __restrict, FILE * __restrict);
 char	*gets(char *);
 #if __BSD_VISIBLE && !defined(__SYS_ERRLIST)
 #define __SYS_ERRLIST
