@@ -16,46 +16,33 @@
  ***
  ****************************************************************************
  ****************************************************************************/
-#ifndef _LINUX_OMAP_ION_H
-#define _LINUX_OMAP_ION_H
-#include <linux/types.h>
-struct omap_ion_tiler_alloc_data {
+#ifndef _LINUX_OMAP_HWC_H
+#define _LINUX_OMAP_HWC_H
+#define HWC_BLT_DESC_FLAG 0x80000000
+#define HWC_BLT_DESC_FB 0x40000000
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- size_t w;
- size_t h;
- int fmt;
- unsigned int flags;
+#define HWC_BLT_DESC_FB_FN(ovlno)   (HWC_BLT_DESC_FLAG | HWC_BLT_DESC_FB | (ovlno))
+#define HWC_BLT_FLAG_USE_FB (1 << 0)
+struct rgz_blt_entry {
+ struct bvbltparams bp;
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- struct ion_handle *handle;
- size_t stride;
- size_t offset;
- unsigned int out_align;
+ struct bvsurfgeom dstgeom;
+ struct bvsurfgeom src1geom;
+ struct bvbuffdesc src1desc;
+ struct bvsurfgeom src2geom;
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- unsigned int token;
+ struct bvbuffdesc src2desc;
 };
-enum {
- OMAP_ION_HEAP_TYPE_TILER = ION_HEAP_TYPE_CUSTOM + 1,
+struct omap_hwc_blit_data {
+ __u16 rgz_flags;
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ __u16 rgz_items;
+ struct rgz_blt_entry rgz_blts[0];
 };
-#define OMAP_ION_HEAP_TILER_MASK (1 << OMAP_ION_HEAP_TYPE_TILER)
-enum {
- OMAP_ION_TILER_ALLOC,
+struct omap_hwc_data {
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-};
-enum {
- TILER_PIXEL_FMT_MIN = 0,
- TILER_PIXEL_FMT_8BIT = 0,
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- TILER_PIXEL_FMT_16BIT = 1,
- TILER_PIXEL_FMT_32BIT = 2,
- TILER_PIXEL_FMT_PAGE = 3,
- TILER_PIXEL_FMT_MAX = 3
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-};
-enum {
- OMAP_ION_HEAP_LARGE_SURFACES,
- OMAP_ION_HEAP_TILER,
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- OMAP_ION_HEAP_SECURE_INPUT,
+ struct dsscomp_setup_dispc_data dsscomp_data;
+ struct omap_hwc_blit_data blit_data;
 };
 #endif
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */

@@ -16,46 +16,29 @@
  ***
  ****************************************************************************
  ****************************************************************************/
-#ifndef _LINUX_OMAP_ION_H
-#define _LINUX_OMAP_ION_H
-#include <linux/types.h>
-struct omap_ion_tiler_alloc_data {
+#ifndef CAIF_DEV_H_
+#define CAIF_DEV_H_
+#include <net/caif/caif_layer.h>
+#include <net/caif/cfcnfg.h>
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- size_t w;
- size_t h;
- int fmt;
- unsigned int flags;
+#include <net/caif/caif_device.h>
+#include <linux/caif/caif_socket.h>
+#include <linux/if.h>
+#include <linux/net.h>
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- struct ion_handle *handle;
- size_t stride;
- size_t offset;
- unsigned int out_align;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- unsigned int token;
+struct caif_param {
+ u16 size;
+ u8 data[256];
 };
-enum {
- OMAP_ION_HEAP_TYPE_TILER = ION_HEAP_TYPE_CUSTOM + 1,
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+struct caif_connect_request {
+ enum caif_protocol_type protocol;
+ struct sockaddr_caif sockaddr;
+ enum caif_channel_priority priority;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ enum caif_link_selector link_selector;
+ int ifindex;
+ struct caif_param param;
 };
-#define OMAP_ION_HEAP_TILER_MASK (1 << OMAP_ION_HEAP_TYPE_TILER)
-enum {
- OMAP_ION_TILER_ALLOC,
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-};
-enum {
- TILER_PIXEL_FMT_MIN = 0,
- TILER_PIXEL_FMT_8BIT = 0,
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- TILER_PIXEL_FMT_16BIT = 1,
- TILER_PIXEL_FMT_32BIT = 2,
- TILER_PIXEL_FMT_PAGE = 3,
- TILER_PIXEL_FMT_MAX = 3
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-};
-enum {
- OMAP_ION_HEAP_LARGE_SURFACES,
- OMAP_ION_HEAP_TILER,
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- OMAP_ION_HEAP_SECURE_INPUT,
-};
 #endif

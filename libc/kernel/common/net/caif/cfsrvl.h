@@ -16,45 +16,36 @@
  ***
  ****************************************************************************
  ****************************************************************************/
-#ifndef RPMSG_OMX_H
-#define RPMSG_OMX_H
-#include <linux/ioctl.h>
-
-/**
- * struct omx_pvr_data - metadata passed to/from userspace for a pvr register
- * @fd:           a file descriptor representing a pvr handle
- * @num_handles:  field filled by driver. userspace uses this to determine
- *                number of handles associated with fd
- * @handles:      opaque pointers pointing to buffers
- */
-struct omx_pvr_data {
-	int fd;
-	unsigned int num_handles;
-	void *handles[2];
+#ifndef CFSRVL_H_
+#define CFSRVL_H_
+#include <linux/list.h>
+#include <linux/stddef.h>
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+#include <linux/types.h>
+#include <linux/kref.h>
+#include <linux/rculist.h>
+struct cfsrvl {
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ struct cflayer layer;
+ bool open;
+ bool phy_flow_on;
+ bool modem_flow_on;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ bool supports_flowctrl;
+ void (*release)(struct cflayer *layer);
+ struct dev_info dev_info;
+ void (*hold)(struct cflayer *lyr);
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ void (*put)(struct cflayer *lyr);
+ struct rcu_head rcu;
 };
-
-#define OMX_IOC_MAGIC 'X'
+struct cflayer *cfvei_create(u8 linkid, struct dev_info *dev_info);
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-#define OMX_IOCCONNECT _IOW(OMX_IOC_MAGIC, 1, char *)
-#define OMX_IOCIONREGISTER _IOWR(OMX_IOC_MAGIC, 2, struct ion_fd_data)
-#define OMX_IOCIONUNREGISTER _IOWR(OMX_IOC_MAGIC, 3, struct ion_fd_data)
-#define OMX_IOCPVRREGISTER _IOWR(OMX_IOC_MAGIC, 4, struct omx_pvr_data)
-
-#define OMX_IOC_MAXNR (4)
+struct cflayer *cfdgml_create(u8 linkid, struct dev_info *dev_info);
+struct cflayer *cfutill_create(u8 linkid, struct dev_info *dev_info);
+struct cflayer *cfvidl_create(u8 linkid, struct dev_info *dev_info);
+struct cflayer *cfrfml_create(u8 linkid, struct dev_info *dev_info,
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-struct omx_conn_req {
- char name[48];
-} __packed;
-struct omx_packet {
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- uint16_t desc;
- uint16_t msg_id;
- uint32_t flags;
- uint32_t fxn_idx;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- int32_t result;
- uint32_t data_size;
- uint32_t data[0];
-};
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ int mtu_size);
+struct cflayer *cfdbgl_create(u8 linkid, struct dev_info *dev_info);
 #endif
