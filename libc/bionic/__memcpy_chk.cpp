@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2012 The Android Open Source Project
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,30 +25,32 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifndef _ARPA_INET_H_
-#define _ARPA_INET_H_
 
-#include <stdint.h>
-#include <sys/types.h>
-#include <netinet/in.h>
+#undef _FORTIFY_SOURCE
+#include <string.h>
+#include <stdlib.h>
+#include <private/logd.h>
 
-__BEGIN_DECLS
+/*
+ * Runtime implementation of __memcpy_chk.
+ *
+ * See
+ *   http://gcc.gnu.org/onlinedocs/gcc/Object-Size-Checking.html
+ *   http://gcc.gnu.org/ml/gcc-patches/2004-09/msg02055.html
+ * for details.
+ *
+ * This memcpy check is called if _FORTIFY_SOURCE is defined and
+ * greater than 0.
+ */
+extern "C" void *__memcpy_chk(void *dest, const void *src,
+              size_t copy_amount, size_t dest_len)
+{
+    if (__builtin_expect(copy_amount > dest_len, 0)) {
+        __libc_android_log_print(ANDROID_LOG_FATAL, "libc",
+            "*** memcpy buffer overflow detected ***\n");
+        __libc_android_log_event_uid(BIONIC_EVENT_MEMCPY_BUFFER_OVERFLOW);
+        abort();
+    }
 
-typedef uint32_t in_addr_t;
-
-extern uint32_t      inet_addr(const char *);
-
-extern int           inet_aton(const char *, struct in_addr *);
-extern char*         inet_ntoa(struct in_addr);
-
-extern int           inet_pton(int, const char *, void *);
-extern const char*   inet_ntop(int, const void *, char *, socklen_t);
-
-extern unsigned int  inet_nsap_addr(const char *, unsigned char *, int);
-extern char*         inet_nsap_ntoa(int, const unsigned char *, char *);
-
-__END_DECLS
-
-#endif /* _ARPA_INET_H_ */
-
-
+    return memcpy(dest, src, copy_amount);
+}
