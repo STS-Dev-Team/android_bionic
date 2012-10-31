@@ -34,9 +34,6 @@
 #include <elf.h>
 #include <sys/exec_elf.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 #include <link.h>
 
 #undef PAGE_MASK
@@ -89,8 +86,6 @@ struct r_debug
     uintptr_t r_ldbase;
 };
 
-typedef struct soinfo soinfo;
-
 #define FLAG_LINKED     0x00000001
 #define FLAG_ERROR      0x00000002
 #define FLAG_EXE        0x00000004 // The main executable
@@ -98,8 +93,7 @@ typedef struct soinfo soinfo;
 
 #define SOINFO_NAME_LEN 128
 
-struct soinfo
-{
+struct soinfo {
     char name[SOINFO_NAME_LEN];
     const Elf32_Phdr *phdr;
     int phnum;
@@ -166,7 +160,9 @@ struct soinfo
     /* When you read a virtual address from the ELF file, add this
      * value to get the corresponding address in the process' address space */
     Elf32_Addr load_bias;
-    int has_text_relocations;
+
+    bool has_text_relocations;
+    bool has_DT_SYMBOLIC;
 };
 
 
@@ -232,8 +228,6 @@ Elf32_Sym *soinfo_find_symbol(soinfo* si, const void *addr);
 Elf32_Sym *soinfo_lookup(soinfo *si, const char *name);
 void soinfo_call_constructors(soinfo *si);
 
-#ifdef __cplusplus
-};
-#endif
+extern "C" void notify_gdb_of_libraries();
 
 #endif
