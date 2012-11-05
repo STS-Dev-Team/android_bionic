@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <stdbool.h>
 #include <signal.h>
 #include <sys/prctl.h>
 #include <errno.h>
@@ -137,8 +136,9 @@ static void logSignalSummary(int signum, const siginfo_t* info) {
     // "info" will be NULL if the siginfo_t information was not available.
     if (info != NULL) {
         format_buffer(buffer, sizeof(buffer),
-            "Fatal signal %d (%s) at 0x%08x (code=%d), thread %d (%s)",
-            signum, signame, info->si_addr, info->si_code, gettid(), threadname);
+                      "Fatal signal %d (%s) at 0x%08x (code=%d), thread %d (%s)",
+                      signum, signame, reinterpret_cast<uintptr_t>(info->si_addr),
+                      info->si_code, gettid(), threadname);
     } else {
         format_buffer(buffer, sizeof(buffer),
             "Fatal signal %d (%s), thread %d (%s)",
