@@ -16,37 +16,40 @@
  ***
  ****************************************************************************
  ****************************************************************************/
-#ifndef _LINUX_SYNC_H
-#define _LINUX_SYNC_H
-#include <linux/types.h>
-struct sync_merge_data {
+#ifndef WCD9XXX_CODEC_DIGITAL_H
+#define WCD9XXX_CODEC_DIGITAL_H
+#define WCD9XXX_A_CHIP_CTL (0x00)
+#define WCD9XXX_A_CHIP_CTL__POR (0x00000000)
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- __s32 fd2;
- char name[32];
- __s32 fence;
-};
+#define WCD9XXX_A_CHIP_STATUS (0x01)
+#define WCD9XXX_A_CHIP_STATUS__POR (0x00000000)
+#define WCD9XXX_A_CHIP_ID_BYTE_0 (0x04)
+#define WCD9XXX_A_CHIP_ID_BYTE_0__POR (0x00000000)
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-struct sync_pt_info {
- __u32 len;
- char obj_name[32];
- char driver_name[32];
+#define WCD9XXX_A_CHIP_ID_BYTE_1 (0x05)
+#define WCD9XXX_A_CHIP_ID_BYTE_1__POR (0x00000000)
+#define WCD9XXX_A_CHIP_ID_BYTE_2 (0x06)
+#define WCD9XXX_A_CHIP_ID_BYTE_2__POR (0x00000000)
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- __s32 status;
- __u64 timestamp_ns;
- __u8 driver_data[0];
-};
+#define WCD9XXX_A_CHIP_ID_BYTE_3 (0x07)
+#define WCD9XXX_A_CHIP_ID_BYTE_3__POR (0x00000001)
+#define WCD9XXX_A_CHIP_VERSION (0x08)
+#define WCD9XXX_A_CHIP_VERSION__POR (0x00000020)
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-struct sync_fence_info_data {
- __u32 len;
- char name[32];
- __s32 status;
+#define WCD9XXX_A_SB_VERSION (0x09)
+#define WCD9XXX_A_SB_VERSION__POR (0x00000010)
+#define WCD9XXX_A_SLAVE_ID_1 (0x0C)
+#define WCD9XXX_A_SLAVE_ID_1__POR (0x00000077)
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- __u8 pt_info[0];
-};
-#define SYNC_IOC_MAGIC '>'
-#define SYNC_IOC_WAIT _IOW(SYNC_IOC_MAGIC, 0, __s32)
+#define WCD9XXX_A_SLAVE_ID_2 (0x0D)
+#define WCD9XXX_A_SLAVE_ID_2__POR (0x00000066)
+#define WCD9XXX_A_SLAVE_ID_3 (0x0E)
+#define WCD9XXX_A_SLAVE_ID_3__POR (0x00000055)
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-#define SYNC_IOC_MERGE _IOWR(SYNC_IOC_MAGIC, 1, struct sync_merge_data)
-#define SYNC_IOC_FENCE_INFO _IOWR(SYNC_IOC_MAGIC, 2,  struct sync_fence_info_data)
+#define WCD9XXX_A_CDC_CTL (0x80)
+#define WCD9XXX_A_CDC_CTL__POR (0x00000000)
+#define WCD9XXX_A_LEAKAGE_CTL (0x88)
+#define WCD9XXX_A_LEAKAGE_CTL__POR (0x00000004)
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 #endif
 

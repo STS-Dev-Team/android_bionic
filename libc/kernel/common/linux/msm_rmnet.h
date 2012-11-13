@@ -16,37 +16,39 @@
  ***
  ****************************************************************************
  ****************************************************************************/
-#ifndef _LINUX_SYNC_H
-#define _LINUX_SYNC_H
-#include <linux/types.h>
-struct sync_merge_data {
+#ifndef _MSM_RMNET_H_
+#define _MSM_RMNET_H_
+#define RMNET_MODE_NONE (0x00)
+#define RMNET_MODE_LLP_ETH (0x01)
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- __s32 fd2;
- char name[32];
- __s32 fence;
+#define RMNET_MODE_LLP_IP (0x02)
+#define RMNET_MODE_QOS (0x04)
+#define RMNET_MODE_MASK (RMNET_MODE_LLP_ETH |   RMNET_MODE_LLP_IP |   RMNET_MODE_QOS)
+#define RMNET_IS_MODE_QOS(mode)   ((mode & RMNET_MODE_QOS) == RMNET_MODE_QOS)
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+#define RMNET_IS_MODE_IP(mode)   ((mode & RMNET_MODE_LLP_IP) == RMNET_MODE_LLP_IP)
+enum rmnet_ioctl_cmds_e {
+ RMNET_IOCTL_SET_LLP_ETHERNET = 0x000089F1,
+ RMNET_IOCTL_SET_LLP_IP = 0x000089F2,
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ RMNET_IOCTL_GET_LLP = 0x000089F3,
+ RMNET_IOCTL_SET_QOS_ENABLE = 0x000089F4,
+ RMNET_IOCTL_SET_QOS_DISABLE = 0x000089F5,
+ RMNET_IOCTL_GET_QOS = 0x000089F6,
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ RMNET_IOCTL_GET_OPMODE = 0x000089F7,
+ RMNET_IOCTL_OPEN = 0x000089F8,
+ RMNET_IOCTL_CLOSE = 0x000089F9,
+ RMNET_IOCTL_MAX
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
+#define QMI_QOS_HDR_S __attribute((__packed__)) qmi_qos_hdr_s
+struct QMI_QOS_HDR_S {
+ unsigned char version;
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-struct sync_pt_info {
- __u32 len;
- char obj_name[32];
- char driver_name[32];
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- __s32 status;
- __u64 timestamp_ns;
- __u8 driver_data[0];
+ unsigned char flags;
+ unsigned long flow_id;
 };
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-struct sync_fence_info_data {
- __u32 len;
- char name[32];
- __s32 status;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- __u8 pt_info[0];
-};
-#define SYNC_IOC_MAGIC '>'
-#define SYNC_IOC_WAIT _IOW(SYNC_IOC_MAGIC, 0, __s32)
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-#define SYNC_IOC_MERGE _IOWR(SYNC_IOC_MAGIC, 1, struct sync_merge_data)
-#define SYNC_IOC_FENCE_INFO _IOWR(SYNC_IOC_MAGIC, 2,  struct sync_fence_info_data)
 #endif
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 
