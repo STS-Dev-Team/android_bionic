@@ -16,37 +16,26 @@
  ***
  ****************************************************************************
  ****************************************************************************/
-#ifndef _LINUX_SYNC_H
-#define _LINUX_SYNC_H
-#include <linux/types.h>
-struct sync_merge_data {
+#ifndef __MSM_AUDIO_WMAPRO_H
+#define __MSM_AUDIO_WMAPRO_H
+#define AUDIO_GET_WMAPRO_CONFIG _IOR(AUDIO_IOCTL_MAGIC,   (AUDIO_MAX_COMMON_IOCTL_NUM+0), unsigned)
+#define AUDIO_SET_WMAPRO_CONFIG _IOW(AUDIO_IOCTL_MAGIC,   (AUDIO_MAX_COMMON_IOCTL_NUM+1), unsigned)
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- __s32 fd2;
- char name[32];
- __s32 fence;
+struct msm_audio_wmapro_config {
+ unsigned short armdatareqthr;
+ uint8_t validbitspersample;
+ uint8_t numchannels;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ unsigned short formattag;
+ unsigned short samplingrate;
+ unsigned short avgbytespersecond;
+ unsigned short asfpacketlength;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
+ unsigned short channelmask;
+ unsigned short encodeopt;
+ unsigned short advancedencodeopt;
+ uint32_t advancedencodeopt2;
+/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-struct sync_pt_info {
- __u32 len;
- char obj_name[32];
- char driver_name[32];
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- __s32 status;
- __u64 timestamp_ns;
- __u8 driver_data[0];
-};
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-struct sync_fence_info_data {
- __u32 len;
- char name[32];
- __s32 status;
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
- __u8 pt_info[0];
-};
-#define SYNC_IOC_MAGIC '>'
-#define SYNC_IOC_WAIT _IOW(SYNC_IOC_MAGIC, 0, __s32)
-/* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
-#define SYNC_IOC_MERGE _IOWR(SYNC_IOC_MAGIC, 1, struct sync_merge_data)
-#define SYNC_IOC_FENCE_INFO _IOWR(SYNC_IOC_MAGIC, 2,  struct sync_fence_info_data)
 #endif
 
