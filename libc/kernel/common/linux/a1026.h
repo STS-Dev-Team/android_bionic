@@ -1,67 +1,85 @@
-/****************************************************************************
- ****************************************************************************
- ***
- ***   This header was automatically generated from a Linux kernel header
- ***   of the same name, to make information necessary for userspace to
- ***   call into the kernel available to libc.  It contains only constants,
- ***   structures, and macros generated from the original header, and thus,
- ***   contains no copyrightable information.
- ***
- ****************************************************************************
- ****************************************************************************/
+/* include/linux/a1026.h - a1026 voice processor driver
+ *
+ * Copyright (C) 2009 HTC Corporation.
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
+
 #ifndef __LINUX_A1026_H
 #define __LINUX_A1026_H
 
 #include <linux/ioctl.h>
-
-#define A1026_MAX_FW_SIZE (32*1024)
+#include <linux/i2c.h>
+#define A1026_MAX_FW_SIZE	(128*1024)
 struct a1026img {
- unsigned char *buf;
- unsigned img_size;
+	unsigned char *buf;
+	unsigned img_size;
 };
 
-enum A1026_PathID {
- A1026_PATH_SUSPEND,
- A1026_PATH_INCALL_RECEIVER,
- A1026_PATH_INCALL_HEADSET,
- A1026_PATH_INCALL_SPEAKER,
- A1026_PATH_INCALL_BT,
- A1026_PATH_VR_NO_NS_RECEIVER,
- A1026_PATH_VR_NO_NS_HEADSET,
- A1026_PATH_VR_NO_NS_SPEAKER,
- A1026_PATH_VR_NO_NS_BT,
- A1026_PATH_VR_NS_RECEIVER,
- A1026_PATH_VR_NS_HEADSET,
- A1026_PATH_VR_NS_SPEAKER,
- A1026_PATH_VR_NS_BT,
- A1026_PATH_RECORD_RECEIVER,
- A1026_PATH_RECORD_HEADSET,
- A1026_PATH_RECORD_SPEAKER,
- A1026_PATH_RECORD_BT,
- A1026_PATH_CAMCORDER,
- A1026_PATH_INCALL_TTY
-};
 
-enum A1026_NS_states {
- A1026_NS_STATE_AUTO,
- A1026_NS_STATE_OFF,
- A1026_NS_STATE_CT,
- A1026_NS_STATE_FT,
- A1026_NS_NUM_STATES
-};
-
+/* indicates if a1026_set_config() performs a full configuration or only
+ * a voice processing algorithm configuration */
+/* IOCTLs for Audience A1026 */
 #define A1026_IOCTL_MAGIC 'u'
 
-#define A1026_BOOTUP_INIT _IOW(A1026_IOCTL_MAGIC, 0x01, struct a1026img *)
-#define A1026_SET_CONFIG _IOW(A1026_IOCTL_MAGIC, 0x02, enum A1026_PathID)
-#define A1026_SET_NS_STATE _IOW(A1026_IOCTL_MAGIC, 0x03, enum A1026_NS_states)
+#define A1026_BOOTUP_INIT  _IO(A1026_IOCTL_MAGIC, 0x01)
+#define A1026_SUSPEND   _IO(A1026_IOCTL_MAGIC, 0x02)
+#define A1026_ENABLE_CLOCK   _IO(A1026_IOCTL_MAGIC, 0x03)
 
-#define A1026_SET_MIC_ONOFF _IOW(A1026_IOCTL_MAGIC, 0x50, unsigned)
-#define A1026_SET_MICSEL_ONOFF _IOW(A1026_IOCTL_MAGIC, 0x51, unsigned)
-#define A1026_READ_DATA _IOR(A1026_IOCTL_MAGIC, 0x52, unsigned)
-#define A1026_WRITE_MSG _IOW(A1026_IOCTL_MAGIC, 0x53, unsigned)
-#define A1026_SYNC_CMD _IO(A1026_IOCTL_MAGIC, 0x54)
-#define A1026_SET_CMD_FILE _IOW(A1026_IOCTL_MAGIC, 0x55, unsigned)
+#ifdef __KERNEL__
 
-#endif
+/* A1026 Command codes */
+#define A100_msg_Sync		0x80000000
+#define A100_msg_Sync_Ack	0x80000000
 
+#define A100_msg_Reset		0x8002
+#define RESET_IMMEDIATE		0x0000
+#define RESET_DELAYED		0x0001
+
+#define A100_msg_BootloadInitiate	0x8003
+
+/* Set Power State */
+#define A100_msg_Sleep		0x80100001
+/* Audio Path Commands */
+
+/* Bypass */
+#define A100_msg_Bypass		0x801C /* 0ff = 0x0000; on = 0x0001 (Default) */
+
+#define A1026_msg_BOOT		0x0001
+#define A1026_msg_BOOT_ACK	0x01
+
+/* general definitions */
+#define TIMEOUT			20 /* ms */
+#define RETRY_CNT		5
+#define POLLING_RETRY_CNT	3
+#define A1026_ERROR_CODE	0xffff
+#define A1026_SLEEP		0
+#define A1026_ACTIVE		1
+#define A1026_CMD_FIFO_DEPTH	64
+#define ERROR			0xffffffff
+
+enum A1026_config_mode {
+	A1026_CONFIG_FULL,
+	A1026_CONFIG_VP
+};
+
+struct a1026_platform_data {
+	uint32_t gpio_a1026_wakeup;
+	uint32_t gpio_a1026_reset;
+	int (*request_resources) (struct i2c_client *client);
+	void (*reset) (bool state);
+	void (*wakeup) (bool state);
+	char firmware_name[128];
+};
+
+
+#endif /* __KERNEL__ */
+#endif /* __LINUX_A1026_H */

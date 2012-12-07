@@ -217,7 +217,7 @@ void __thread_entry(int (*func)(void*), void *arg, void **tls)
     pthread_exit( (void*)func(arg) );
 }
 
-void _init_thread(pthread_internal_t * thread, pid_t kernel_id, pthread_attr_t * attr, void * stack_base)
+void _init_thread(pthread_internal_t * thread, pid_t kernel_id, pid_t group_id, pthread_attr_t * attr, void * stack_base)
 {
     if (attr == NULL) {
         thread->attr = gDefaultPthreadAttr;
@@ -226,6 +226,7 @@ void _init_thread(pthread_internal_t * thread, pid_t kernel_id, pthread_attr_t *
     }
     thread->attr.stack_base = stack_base;
     thread->kernel_id       = kernel_id;
+    thread->group_id        = group_id;
 
     // set the scheduling policy/priority of the thread
     if (thread->attr.sched_policy != SCHED_NORMAL) {
@@ -302,6 +303,7 @@ int pthread_create(pthread_t *thread_out, pthread_attr_t const * attr,
     char*   stack;
     void**  tls;
     int tid;
+    int gid;
     pthread_mutex_t * start_mutex;
     pthread_internal_t * thread;
     int                  madestack = 0;
@@ -354,6 +356,7 @@ int pthread_create(pthread_t *thread_out, pthread_attr_t const * attr,
 
     tls[TLS_SLOT_THREAD_ID] = thread;
 
+    gid = __get_thread()->group_id;
     tid = __pthread_clone((int(*)(void*))start_routine, tls,
                 CLONE_FILES | CLONE_FS | CLONE_VM | CLONE_SIGHAND
                 | CLONE_THREAD | CLONE_SYSVSEM | CLONE_DETACHED,
@@ -369,7 +372,7 @@ int pthread_create(pthread_t *thread_out, pthread_attr_t const * attr,
         return result;
     }
 
-    _init_thread(thread, tid, (pthread_attr_t*)attr, stack);
+    _init_thread(thread, tid, gid, (pthread_attr_t*)attr, stack);
 
     if (!madestack)
         thread->attr.flags |= PTHREAD_ATTR_FLAG_USER_STACK;
@@ -571,6 +574,7 @@ void pthread_exit(void * retval)
     void*                stack_base = thread->attr.stack_base;
     int                  stack_size = thread->attr.stack_size;
     int                  user_stack = (thread->attr.flags & PTHREAD_ATTR_FLAG_USER_STACK) != 0;
+    sigset_t mask;
 
     // call the cleanup handlers first
     while (thread->cleanup_stack) {
@@ -612,6 +616,10 @@ void pthread_exit(void * retval)
         }
         pthread_mutex_unlock(&gThreadListLock);
     }
+
+    sigfillset(&mask);
+    sigdelset(&mask, SIGSEGV);
+    (void)sigprocmask(SIG_SETMASK, &mask, (sigset_t *)NULL);
 
     // destroy the thread stack
     if (user_stack)
@@ -1474,10 +1482,12 @@ int __pthread_cond_timedwait_relative(pthread_cond_t *cond,
     int  oldvalue = cond->value;
 
     pthread_mutex_unlock(mutex);
-    status = __futex_wait_ex(&cond->value, COND_IS_SHARED(cond), oldvalue, reltime);
+    do {
+        status = __futex_wait_ex(&cond->value, COND_IS_SHARED(cond), oldvalue, reltime);
+    } while (reltime == NULL && status == (-EINTR));
     pthread_mutex_lock(mutex);
 
-    if (status == (-ETIMEDOUT)) return ETIMEDOUT;
+    if (status == (-ETIMEDOUT) || status == (-EINTR)) return (-status);
     return 0;
 }
 
@@ -1839,7 +1849,7 @@ static void pthread_key_clean_all(void)
 }
 
 // man says this should be in <linux/unistd.h>, but it isn't
-extern int tkill(int tid, int sig);
+extern int tgkill(int tgid, int tid, int sig);
 
 int pthread_kill(pthread_t tid, int sig)
 {
@@ -1847,7 +1857,7 @@ int pthread_kill(pthread_t tid, int sig)
     int  old_errno = errno;
     pthread_internal_t * thread = (pthread_internal_t *)tid;
 
-    ret = tkill(thread->kernel_id, sig);
+    ret = tgkill(thread->group_id, thread->kernel_id, sig);
     if (ret < 0) {
         ret = errno;
         errno = old_errno;
@@ -1856,7 +1866,21 @@ int pthread_kill(pthread_t tid, int sig)
     return ret;
 }
 
-extern int __rt_sigprocmask(int, const sigset_t *, sigset_t *, size_t);
+/* Despite the fact that our kernel headers define sigset_t explicitly
+ * as a 32-bit integer, the kernel system call really expects a 64-bit
+ * bitmap for the signal set, or more exactly an array of two-32-bit
+ * values (see $KERNEL/arch/$ARCH/include/asm/signal.h for details).
+ *
+ * Unfortunately, we cannot fix the sigset_t definition without breaking
+ * the C library ABI, so perform a little runtime translation here.
+ */
+typedef union {
+    sigset_t   bionic;
+    uint32_t   kernel[2];
+} kernel_sigset_t;
+
+/* this is a private syscall stub */
+extern int __rt_sigprocmask(int, const kernel_sigset_t *, kernel_sigset_t *, size_t);
 
 int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset)
 {
@@ -1865,15 +1889,30 @@ int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset)
      */
     int ret, old_errno = errno;
 
-    /* Use NSIG which corresponds to the number of signals in
-     * our 32-bit sigset_t implementation. As such, this function, or
-     * anything that deals with sigset_t cannot manage real-time signals
-     * (signo >= 32). We might want to introduce sigset_rt_t as an
-     * extension to do so in the future.
-     */
-    ret = __rt_sigprocmask(how, set, oset, NSIG / 8);
+    /* We must convert *set into a kernel_sigset_t */
+    kernel_sigset_t  in_set, *in_set_ptr;
+    kernel_sigset_t  out_set;
+
+    in_set.kernel[0] = in_set.kernel[1] = 0;
+    out_set.kernel[0] = out_set.kernel[1] = 0;
+
+    /* 'in_set_ptr' is the second parameter to __rt_sigprocmask. It must be NULL
+     * if 'set' is NULL to ensure correct semantics (which in this case would
+     * be to ignore 'how' and return the current signal set into 'oset'.
+      */
+    if (set == NULL) {
+        in_set_ptr = NULL;
+    } else {
+        in_set.bionic = *set;
+        in_set_ptr = &in_set;
+    }
+
+    ret = __rt_sigprocmask(how, in_set_ptr, &out_set, sizeof(kernel_sigset_t));
     if (ret < 0)
         ret = errno;
+
+    if (oset)
+        *oset = out_set.bionic;
 
     errno = old_errno;
     return ret;

@@ -285,6 +285,8 @@ extern void  __pthread_cleanup_push(__pthread_cleanup_t*      c,
 extern void  __pthread_cleanup_pop(__pthread_cleanup_t*  c,
                                    int                   execute);
 
+extern void __add_mutex_fork_cb(pthread_mutex_t *mutex);
+
 /* Believe or not, the definitions of pthread_cleanup_push and
  * pthread_cleanup_pop below are correct. Posix states that these
  * can be implemented as macros that might introduce opening and

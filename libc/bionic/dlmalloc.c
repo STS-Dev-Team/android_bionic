@@ -512,7 +512,7 @@ DEFAULT_MMAP_THRESHOLD       default: 256K
 #endif  /* ONLY_MSPACES */
 #endif  /* MSPACES */
 #ifndef MALLOC_ALIGNMENT
-#define MALLOC_ALIGNMENT ((size_t)8U)
+#define MALLOC_ALIGNMENT ((size_t)16U)
 #endif  /* MALLOC_ALIGNMENT */
 #ifndef FOOTERS
 #define FOOTERS 0
@@ -1816,7 +1816,10 @@ typedef unsigned int flag_t;           /* The type of various bit flag sets */
 
 /* Return true if malloced space is not necessarily cleared */
 #if MMAP_CLEARS
-#define calloc_must_clear(p) (!is_mmapped(p))
+/* is_mmapped() need be pretected by dlmalloc mutex. otherwise, race issue
+ * could be triggered. So we force calloc_must_clear always true.
+ */
+#define calloc_must_clear(p) (1)
 #else /* MMAP_CLEARS */
 #define calloc_must_clear(p) (1)
 #endif /* MMAP_CLEARS */
@@ -2143,6 +2146,17 @@ static struct malloc_state _gm_
 #define is_global(M)       ((M) == &_gm_)
 #define is_initialized(M)  ((M)->top != 0)
 
+#if USE_LOCKS
+
+/* Register malloc state mutex, which will be reset in child process after a fork */
+#define MALLOC_MUTEX_ATFORK_REGISTER() __add_mutex_fork_cb(&gm->mutex)
+#else  /* USE_LOCKS */
+
+#ifndef MALLOC_MUTEX_ATFORK_REGISTER
+#define MALLOC_MUTEX_ATFORK_REGISTER()
+#endif
+#endif /* USE_LOCKS */
+
 /* -------------------------- system alloc setup ------------------------- */
 
 /* Operations on mflags */
@@ -2260,8 +2274,11 @@ int malloc_corruption_error_count;
 /* default corruption action */
 static void reset_on_error(mstate m);
 
+#define DUMP_HEAP_BEFORE_ERROR_ACTION(m, p)
 #define CORRUPTION_ERROR_ACTION(m)  reset_on_error(m)
 #define USAGE_ERROR_ACTION(m, p)
+
+#define PRINT_SIZE(size)
 
 #else /* PROCEED_ON_ERROR */
 
@@ -2273,6 +2290,226 @@ static void reset_on_error(mstate m);
 #ifdef LOG_ON_HEAP_ERROR
 
 #  include <private/logd.h>
+
+static char* __uint_to_char(unsigned int val, char* buff, int len, int base)
+{
+    const char *base_char = "0123456789ABCDEF";
+    char* ptr = buff + len - 1;
+    *ptr = '\0';
+
+    if(base < 2 || base > 16)
+        return ptr;
+
+    if (val != 0)
+    {
+        while(ptr != buff && val != 0)
+        {
+            *--ptr = base_char[val % base];
+            val /= base;
+        }
+    }
+    else if (ptr != buff)
+        *--ptr = '0';
+
+    if ( base == 16 && ptr != buff && ptr - 1 != buff)
+    {
+        *--ptr = 'x';
+        *--ptr = '0';
+    }
+
+    return ptr;
+}
+
+static void __log_alloc_size(size_t size)
+{
+    char buffer[128];
+    const int len = 36;
+    const int base = 10;
+    char s[len];
+    strlcpy(buffer, "malloc size: ", sizeof(buffer));
+    strlcat(buffer, __uint_to_char(size, s, len, base), sizeof(buffer));
+    __libc_android_log_write(ANDROID_LOG_FATAL, "libc", buffer);
+}
+
+static void __bionic_heap_state_dump(mchunkptr p, char *tag)
+{
+    char buffer[1024];
+    const int addr_len = 36;
+    const int addr_base = 16;
+    const int decimal_base = 10;
+    char addr[addr_len];
+
+    strlcpy(buffer, "*************************>>>Dumping heap<<<*************************", sizeof(buffer));
+    strlcat(buffer, "\nDumping heap: ", sizeof(buffer));
+    strlcat(buffer, __uint_to_char((unsigned int)p, addr, addr_len, addr_base), sizeof(buffer));
+    strlcat(buffer, "(", sizeof(buffer));
+    strlcat(buffer, tag, sizeof(buffer));
+    strlcat(buffer, "), cinuse(", sizeof(buffer));
+    strlcat(buffer, cinuse(p) ? "1" : "0", sizeof(buffer));
+    strlcat(buffer, "), pinuse(", sizeof(buffer));
+    strlcat(buffer, pinuse(p) ? "1" : "0", sizeof(buffer));
+    strlcat(buffer, "), chunksize(", sizeof(buffer));
+    strlcat(buffer, __uint_to_char(chunksize(p), addr, addr_len, decimal_base), sizeof(buffer));
+    strlcat(buffer, ") \n>>>> Heap: ", sizeof(buffer));
+    strlcat(buffer, __uint_to_char((unsigned int)p->prev_foot, addr, addr_len, addr_base), sizeof(buffer));
+    strlcat(buffer, "(prev_foot) \n>>>> Heap: ", sizeof(buffer));
+    strlcat(buffer, __uint_to_char((unsigned int)p->head, addr, addr_len, addr_base), sizeof(buffer));
+    strlcat(buffer, "(head) \n>>>> Heap: ", sizeof(buffer));
+    strlcat(buffer, __uint_to_char((unsigned int)p->fd, addr, addr_len, addr_base), sizeof(buffer));
+    strlcat(buffer, "(fd) \n>>>> Heap: ", sizeof(buffer));
+    strlcat(buffer, __uint_to_char((unsigned int)p->bk, addr, addr_len, addr_base), sizeof(buffer));
+    strlcat(buffer, "(bk)", sizeof(buffer));
+
+    //Dump heap treebin info if large chunk
+    if ((chunksize(p) >> SMALLBIN_SHIFT) >= NSMALLBINS)
+    {
+        tbinptr q = (tbinptr)p;
+        strlcat(buffer, "\n>>>> Heap: ", sizeof(buffer));
+        strlcat(buffer, __uint_to_char((unsigned int)q->child[0], addr, addr_len, addr_base), sizeof(buffer));
+        strlcat(buffer, "(child[0])", sizeof(buffer));
+        strlcat(buffer, "\n>>>> Heap: ", sizeof(buffer));
+        strlcat(buffer, __uint_to_char((unsigned int)q->child[1], addr, addr_len, addr_base), sizeof(buffer));
+        strlcat(buffer, "(child[1])", sizeof(buffer));
+        strlcat(buffer, "\n>>>> Heap: ", sizeof(buffer));
+        strlcat(buffer, __uint_to_char((unsigned int)q->parent, addr, addr_len, addr_base), sizeof(buffer));
+        strlcat(buffer, "(parent)", sizeof(buffer));
+    }
+
+    __libc_android_log_write(ANDROID_LOG_FATAL,"libc",buffer);
+}
+
+static void __bionic_heap_state_debug(mstate m, mchunkptr p, int line)
+{
+    char buffer[512];
+    const int addr_len = 36;
+    const int addr_base = 16;
+    const int decimal_base = 10;
+    char addr[addr_len];
+    strlcpy(buffer, "FATAL ERROR occurring at line: ", sizeof(buffer));
+    strlcat(buffer, __uint_to_char(line, addr, addr_len, decimal_base), sizeof(buffer));
+    strlcat(buffer, "\nleast_addr: ", sizeof(buffer));
+    strlcat(buffer, __uint_to_char((unsigned int)m->least_addr, addr, addr_len, addr_base), sizeof(buffer));
+    strlcat(buffer, ", mchunkptr: ", sizeof(buffer));
+    strlcat(buffer, __uint_to_char((unsigned int)p, addr, addr_len, addr_base), sizeof(buffer));
+
+    strlcat(buffer, "\nSegment Infomation(base, size): ", sizeof(buffer));
+    msegmentptr sp = &m->seg;
+    for (;;) {
+        strlcat(buffer, "(", sizeof(buffer));
+        strlcat(buffer, __uint_to_char((unsigned int)sp->base, addr, addr_len, addr_base), sizeof(buffer));
+        strlcat(buffer, ",", sizeof(buffer));
+        strlcat(buffer, __uint_to_char(sp->size, addr, addr_len, decimal_base), sizeof(buffer));
+        strlcat(buffer, ")", sizeof(buffer));
+        if ((sp = sp->next) == 0)
+          break;
+    }
+
+    __libc_android_log_write(ANDROID_LOG_FATAL,"libc",buffer);
+
+    if (segment_holding(m, (char*)p) != 0
+        && segment_holding(m, ((char *)p + sizeof(mchunk) - 1)) != 0)
+    {
+        __bionic_heap_state_dump(p,"p");
+
+        if (segment_holding(m, (char*)p->fd) != 0
+            && segment_holding(m, ((char *)p->fd + sizeof(mchunk) - 1)) != 0)
+            __bionic_heap_state_dump(p->fd, "p->fd");
+        else
+        {
+            __libc_android_log_write(ANDROID_LOG_FATAL,"libc",
+            "*************************>>>Dumping heap<<<*************************\n"
+            "Dumping Heap: p->fd is invalid with any segment");
+        }
+
+        if (segment_holding(m, (char*)(p->bk)) != 0
+            && segment_holding(m, ((char *)p->bk + sizeof(mchunk) - 1)) != 0)
+            __bionic_heap_state_dump(p->bk, "p->bk");
+        else
+        {
+            __libc_android_log_write(ANDROID_LOG_FATAL,"libc",
+            "*************************>>>Dumping heap<<<*************************\n"
+            "Dumping Heap: p->bk is invalid with any segment");
+        }
+
+        //prev chunk adjacent
+        if (!pinuse(p))
+        {
+            size_t prevsize = p->prev_foot;
+            mchunkptr prev = chunk_minus_offset(p, prevsize);
+            if (segment_holding(m, (char*)prev) != 0
+                && segment_holding(m, ((char *)prev + sizeof(mchunk) - 1)) != 0)
+                __bionic_heap_state_dump(prev, "prev");
+            else
+            {
+                __libc_android_log_write(ANDROID_LOG_FATAL,"libc",
+                "*************************>>>Dumping heap<<<*************************\n"
+                "Dumping Heap: \"prev\" is invalid with any segment");
+            }
+        }
+        else
+            __libc_android_log_write(ANDROID_LOG_FATAL,"libc",
+            "*************************>>>Dumping heap<<<*************************\n"
+            "Dumping Heap: \"prev\" is inuse");
+
+        //next chunk adjacent
+        size_t psize = chunksize(p);
+        mchunkptr next = chunk_plus_offset(p, psize);
+        if ((char*)p < (char*)next && segment_holding(m, (char*)next) != 0
+            && segment_holding(m, ((char *)next + sizeof(mchunk) - 1)) != 0)
+            __bionic_heap_state_dump(next, "next");
+        else
+        {
+            __libc_android_log_write(ANDROID_LOG_FATAL,"libc",
+            "*************************>>>Dumping heap<<<*************************\n"
+            "Dumping Heap: \"next\" is invalid with any segment");
+        }
+
+        //Dump heap treebin info if large chunk
+        if((psize >> SMALLBIN_SHIFT) >= NSMALLBINS)
+        {
+            tbinptr q = (tbinptr)p;
+            if (segment_holding(m, (char*)(q->child[0])) != 0
+                && segment_holding(m, ((char *)q->child[0] + sizeof(tchunk) - 1)) != 0)
+                __bionic_heap_state_dump((mchunkptr)q->child[0], "p->child[0]");
+            else
+            {
+                __libc_android_log_write(ANDROID_LOG_FATAL,"libc",
+                "*************************>>>Dumping heap<<<*************************\n"
+                "Dumping Heap: p->child[0] is invalid with any segment");
+            }
+
+            if (segment_holding(m, (char*)(q->child[1])) != 0
+                && segment_holding(m, ((char *)q->child[1] + sizeof(tchunk) - 1)) != 0)
+                __bionic_heap_state_dump((mchunkptr)q->child[1], "p->child[1]");
+            else
+            {
+                __libc_android_log_write(ANDROID_LOG_FATAL,"libc",
+                "*************************>>>Dumping heap<<<*************************\n"
+                "Dumping Heap: p->child[1] is invalid with any segment");
+            }
+
+            if (segment_holding(m, (char*)(q->parent)) != 0
+                && segment_holding(m, ((char *)q->parent + sizeof(tchunk) - 1)) != 0)
+                __bionic_heap_state_dump((mchunkptr)q->parent, "p->parent");
+            else
+            {
+                __libc_android_log_write(ANDROID_LOG_FATAL,"libc",
+                "*************************>>>Dumping heap<<<*************************\n"
+                "Dumping Heap: p->parent is invalid with any segment");
+            }
+        }
+    }
+    else
+    {
+        __libc_android_log_write(ANDROID_LOG_FATAL,"libc",
+        "*************************>>>Dumping heap<<<*************************\n"
+        "Dumping Heap: \"p\" is invalid with any segment\n"
+        "Dumping Heap: p->fd is invalid with any segment\n"
+        "Dumping Heap: p->bk is invalid with any segment\n"
+        "Dumping Heap: \"prev\" is invalid with any segment\n"
+        "Dumping Heap: \"next\" is invalid with any segment");
+    }
+}
 
 static void __bionic_heap_error(const char* msg, const char* function)
 {
@@ -2291,17 +2528,35 @@ static void __bionic_heap_error(const char* msg, const char* function)
     abort();
 }
 
+#ifndef PRINT_SIZE
+#define PRINT_SIZE(size) __log_alloc_size((size))
+#endif
+
+#  ifndef DUMP_HEAP_BEFORE_ERROR_ACTION
+#    define DUMP_HEAP_BEFORE_ERROR_ACTION(m, p)  \
+    __bionic_heap_state_debug(m,(mchunkptr)p, __LINE__);
+#  endif
 #  ifndef CORRUPTION_ERROR_ACTION
 #    define CORRUPTION_ERROR_ACTION(m)  \
     __bionic_heap_error("HEAP MEMORY CORRUPTION", __FUNCTION__)
 #  endif
 #  ifndef USAGE_ERROR_ACTION
 #    define USAGE_ERROR_ACTION(m,p)   \
-    __bionic_heap_error("INVALID HEAP ADDRESS", __FUNCTION__)
+    do {    \
+    DUMP_HEAP_BEFORE_ERROR_ACTION(m,p);  \
+    __bionic_heap_error("INVALID HEAP ADDRESS", __FUNCTION__);  \
+    } while(0)
 #  endif
 
 #else /* !LOG_ON_HEAP_ERROR */
 
+#ifndef PRINT_SIZE
+#define PRINT_SIZE(size)
+#endif
+
+#  ifndef DUMP_HEAP_BEFORE_ERROR_ACTION
+#    define DUMP_HEAP_BEFORE_ERROR_ACTION(m, p)
+#  endif /* DUMP_HEAP_BEFORE_ERROR_ACTION */
 #  ifndef CORRUPTION_ERROR_ACTION
 #    define CORRUPTION_ERROR_ACTION(m) ABORT
 #  endif /* CORRUPTION_ERROR_ACTION */
@@ -2615,6 +2870,7 @@ static int init_mparams(void) {
       /* Set up lock for main malloc area */
       INITIAL_LOCK(&gm->mutex);
       gm->mflags = mparams.default_mflags;
+      MALLOC_MUTEX_ATFORK_REGISTER();
     }
     RELEASE_MAGIC_INIT_LOCK();
 
@@ -3040,6 +3296,7 @@ static void internal_malloc_stats(mstate m) {
   else if (RTCHECK(ok_address(M, B->fd)))\
     F = B->fd;\
   else {\
+    DUMP_HEAP_BEFORE_ERROR_ACTION(M, B);\
     CORRUPTION_ERROR_ACTION(M);\
   }\
   B->fd = P;\
@@ -3056,8 +3313,10 @@ static void internal_malloc_stats(mstate m) {
   mchunkptr F = P->fd;\
   mchunkptr B = P->bk;\
   bindex_t I = small_index(S);\
-  if (__builtin_expect (F->bk != P || B->fd != P, 0))\
+  if (__builtin_expect (F->bk != P || B->fd != P, 0)) {\
+    DUMP_HEAP_BEFORE_ERROR_ACTION(M, P);\
     CORRUPTION_ERROR_ACTION(M);\
+  }\
   assert(P != B);\
   assert(P != F);\
   assert(chunksize(P) == small_index2size(I));\
@@ -3069,6 +3328,7 @@ static void internal_malloc_stats(mstate m) {
     B->fd = F;\
   }\
   else {\
+    DUMP_HEAP_BEFORE_ERROR_ACTION(M, P);\
     CORRUPTION_ERROR_ACTION(M);\
   }\
 }
@@ -3079,8 +3339,10 @@ static void internal_malloc_stats(mstate m) {
  */
 #define unlink_first_small_chunk(M, B, P, I) {\
   mchunkptr F = P->fd;\
-  if (__builtin_expect (F->bk != P || B->fd != P, 0))\
+  if (__builtin_expect (F->bk != P || B->fd != P, 0)) {\
+    DUMP_HEAP_BEFORE_ERROR_ACTION(M, P);\
     CORRUPTION_ERROR_ACTION(M);\
+  }\
   assert(P != B);\
   assert(P != F);\
   assert(chunksize(P) == small_index2size(I));\
@@ -3091,6 +3353,7 @@ static void internal_malloc_stats(mstate m) {
     F->bk = B;\
   }\
   else {\
+    DUMP_HEAP_BEFORE_ERROR_ACTION(M, P);\
     CORRUPTION_ERROR_ACTION(M);\
   }\
 }
@@ -3140,6 +3403,7 @@ static void internal_malloc_stats(mstate m) {
           break;\
         }\
         else {\
+          DUMP_HEAP_BEFORE_ERROR_ACTION(M, T);\
           CORRUPTION_ERROR_ACTION(M);\
           break;\
         }\
@@ -3154,6 +3418,7 @@ static void internal_malloc_stats(mstate m) {
           break;\
         }\
         else {\
+          DUMP_HEAP_BEFORE_ERROR_ACTION(M, T);\
           CORRUPTION_ERROR_ACTION(M);\
           break;\
         }\
@@ -3184,32 +3449,40 @@ static void internal_malloc_stats(mstate m) {
 
 #define unlink_large_chunk(M, X) {\
   tchunkptr XP = X->parent;\
+  tchunkptr RPBK;\
   tchunkptr R;\
   if (X->bk != X) {\
     tchunkptr F = X->fd;\
+    RPBK = X;\
     R = X->bk;\
-    if (__builtin_expect (F->bk != X || R->fd != X, 0))\
+    if (__builtin_expect (F->bk != X || R->fd != X, 0)) {\
+      DUMP_HEAP_BEFORE_ERROR_ACTION(M, X);\
       CORRUPTION_ERROR_ACTION(M);\
+    }\
     if (RTCHECK(ok_address(M, F))) {\
       F->bk = R;\
       R->fd = F;\
     }\
     else {\
+      DUMP_HEAP_BEFORE_ERROR_ACTION(M, X);\
       CORRUPTION_ERROR_ACTION(M);\
     }\
   }\
   else {\
     tchunkptr* RP;\
+    RPBK = X;\
     if (((R = *(RP = &(X->child[1]))) != 0) ||\
         ((R = *(RP = &(X->child[0]))) != 0)) {\
       tchunkptr* CP;\
       while ((*(CP = &(R->child[1])) != 0) ||\
              (*(CP = &(R->child[0])) != 0)) {\
+        RPBK = R;\
         R = *(RP = CP);\
       }\
       if (RTCHECK(ok_address(M, RP)))\
         *RP = 0;\
       else {\
+        DUMP_HEAP_BEFORE_ERROR_ACTION(M, RPBK);\
         CORRUPTION_ERROR_ACTION(M);\
       }\
     }\
@@ -3226,8 +3499,10 @@ static void internal_malloc_stats(mstate m) {
       else \
         XP->child[1] = R;\
     }\
-    else\
+    else {\
+      DUMP_HEAP_BEFORE_ERROR_ACTION(M, X);\
       CORRUPTION_ERROR_ACTION(M);\
+    }\
     if (R != 0) {\
       if (RTCHECK(ok_address(M, R))) {\
         tchunkptr C0, C1;\
@@ -3237,20 +3512,26 @@ static void internal_malloc_stats(mstate m) {
             R->child[0] = C0;\
             C0->parent = R;\
           }\
-          else\
+          else {\
+            DUMP_HEAP_BEFORE_ERROR_ACTION(M, X);\
             CORRUPTION_ERROR_ACTION(M);\
+          }\
         }\
         if ((C1 = X->child[1]) != 0) {\
           if (RTCHECK(ok_address(M, C1))) {\
             R->child[1] = C1;\
             C1->parent = R;\
           }\
-          else\
+          else {\
+            DUMP_HEAP_BEFORE_ERROR_ACTION(M, X);\
             CORRUPTION_ERROR_ACTION(M);\
+          }\
         }\
       }\
-      else\
+      else {\
+        DUMP_HEAP_BEFORE_ERROR_ACTION(M, RPBK);\
         CORRUPTION_ERROR_ACTION(M);\
+      }\
     }\
   }\
 }
@@ -3834,6 +4115,8 @@ static int sys_trim(mstate m, size_t pad) {
 /* allocate a large request from the best fitting chunk in a treebin */
 static void* tmalloc_large(mstate m, size_t nb) {
   tchunkptr v = 0;
+  tchunkptr vBK = 0;
+  tchunkptr tBK = 0;
   size_t rsize = -nb; /* Unsigned negation */
   tchunkptr t;
   bindex_t idx;
@@ -3843,19 +4126,26 @@ static void* tmalloc_large(mstate m, size_t nb) {
     /* Traverse tree for this bin looking for node with size == nb */
     size_t sizebits = nb << leftshift_for_tree_index(idx);
     tchunkptr rst = 0;  /* The deepest untaken right subtree */
+    tchunkptr rstBK = 0;
+    tBK = 0;
     for (;;) {
       tchunkptr rt;
       size_t trem = chunksize(t) - nb;
       if (trem < rsize) {
+        vBK = tBK;
         v = t;
         if ((rsize = trem) == 0)
           break;
       }
       rt = t->child[1];
+      tBK = t;
       t = t->child[(sizebits >> (SIZE_T_BITSIZE-SIZE_T_ONE)) & 1];
-      if (rt != 0 && rt != t)
+      if (rt != 0 && rt != t) {
+        rstBK = tBK;
         rst = rt;
+      }
       if (t == 0) {
+        tBK = rstBK;
         t = rst; /* set t to least subtree holding sizes > nb */
         break;
       }
@@ -3869,6 +4159,7 @@ static void* tmalloc_large(mstate m, size_t nb) {
       bindex_t i;
       binmap_t leastbit = least_bit(leftbits);
       compute_bit2idx(leastbit, i);
+      tBK = 0;
       t = *treebin_at(m, i);
     }
   }
@@ -3877,8 +4168,10 @@ static void* tmalloc_large(mstate m, size_t nb) {
     size_t trem = chunksize(t) - nb;
     if (trem < rsize) {
       rsize = trem;
+      vBK = tBK;
       v = t;
     }
+    tBK = t;
     t = leftmost_child(t);
   }
 
@@ -3899,6 +4192,7 @@ static void* tmalloc_large(mstate m, size_t nb) {
         return chunk2mem(v);
       }
     }
+    DUMP_HEAP_BEFORE_ERROR_ACTION(m, vBK);
     CORRUPTION_ERROR_ACTION(m);
   }
   return 0;
@@ -3907,18 +4201,21 @@ static void* tmalloc_large(mstate m, size_t nb) {
 /* allocate a small request from the best fitting chunk in a treebin */
 static void* tmalloc_small(mstate m, size_t nb) {
   tchunkptr t, v;
+  tchunkptr tBK, vBK;
   size_t rsize;
   bindex_t i;
   binmap_t leastbit = least_bit(m->treemap);
   compute_bit2idx(leastbit, i);
 
   v = t = *treebin_at(m, i);
+  vBK = 0;
   rsize = chunksize(t) - nb;
 
-  while ((t = leftmost_child(t)) != 0) {
+  while (tBK = t, (t = leftmost_child(t)) != 0) {
     size_t trem = chunksize(t) - nb;
     if (trem < rsize) {
       rsize = trem;
+      vBK = tBK;
       v = t;
     }
   }
@@ -3939,6 +4236,7 @@ static void* tmalloc_small(mstate m, size_t nb) {
     }
   }
 
+  DUMP_HEAP_BEFORE_ERROR_ACTION(m, vBK);
   CORRUPTION_ERROR_ACTION(m);
   return 0;
 }
@@ -3948,6 +4246,7 @@ static void* tmalloc_small(mstate m, size_t nb) {
 static void* internal_realloc(mstate m, void* oldmem, size_t bytes) {
   if (bytes >= MAX_REQUEST) {
     MALLOC_FAILURE_ACTION;
+    PRINT_SIZE(bytes);
     return 0;
   }
   if (!PREACTION(m)) {
@@ -3989,6 +4288,7 @@ static void* internal_realloc(mstate m, void* oldmem, size_t bytes) {
     else {
       USAGE_ERROR_ACTION(m, oldmem);
       POSTACTION(m);
+      PRINT_SIZE(bytes);
       return 0;
     }
 
@@ -4008,9 +4308,12 @@ static void* internal_realloc(mstate m, void* oldmem, size_t bytes) {
         memcpy(newmem, oldmem, (oc < bytes)? oc : bytes);
         internal_free(m, oldmem);
       }
+      if (newmem == NULL)
+        PRINT_SIZE(bytes);
       return newmem;
     }
   }
+  PRINT_SIZE(bytes);
   return 0;
 }
 
@@ -4360,9 +4663,12 @@ void* dlmalloc(size_t bytes) {
 
   postaction:
     POSTACTION(gm);
+    if (mem == NULL)
+        PRINT_SIZE(bytes);
     return mem;
   }
 
+  PRINT_SIZE(bytes);
   return 0;
 }
 
@@ -4582,8 +4888,25 @@ void dlmalloc_stats() {
 size_t dlmalloc_usable_size(void* mem) {
   if (mem != 0) {
     mchunkptr p = mem2chunk(mem);
-    if (cinuse(p))
-      return chunksize(p) - overhead_for(p);
+
+#if FOOTERS
+    mstate fm = get_mstate_for(p);
+    if (!ok_magic(fm)) {
+      USAGE_ERROR_ACTION(fm, p);
+      return;
+    }
+#else /* FOOTERS */
+#define fm gm
+#endif
+
+    if (!PREACTION(fm)) {
+      if (cinuse(p)) {
+        size_t ret = chunksize(p) - overhead_for(p);
+        POSTACTION(fm);
+        return ret;
+      }
+      POSTACTION(fm);
+    }
   }
   return 0;
 }
@@ -5187,32 +5510,35 @@ void dlmalloc_walk_heap(void(*handler)(const void *chunkptr, size_t chunklen,
   mstate m = (mstate)gm;
 #endif
 
-  s = &m->seg;
-  while (s != 0) {
-    mchunkptr p = align_as_chunk(s->base);
-    while (segment_holds(s, p) &&
-           p != m->top && p->head != FENCEPOST_HEAD) {
-      void *chunkptr, *userptr;
-      size_t chunklen, userlen;
-      chunkptr = p;
-      chunklen = chunksize(p);
-      if (cinuse(p)) {
-        userptr = chunk2mem(p);
-        userlen = chunklen - overhead_for(p);
+  if (!PREACTION(m)) {
+    s = &m->seg;
+    while (s != 0) {
+      mchunkptr p = align_as_chunk(s->base);
+      while (segment_holds(s, p) &&
+             p != m->top && p->head != FENCEPOST_HEAD) {
+        void *chunkptr, *userptr;
+        size_t chunklen, userlen;
+        chunkptr = p;
+        chunklen = chunksize(p);
+        if (cinuse(p)) {
+          userptr = chunk2mem(p);
+          userlen = chunklen - overhead_for(p);
+        }
+        else {
+          userptr = NULL;
+          userlen = 0;
+        }
+        handler(chunkptr, chunklen, userptr, userlen, harg);
+        p = next_chunk(p);
       }
-      else {
-        userptr = NULL;
-        userlen = 0;
+      if (p == m->top) {
+        /* The top chunk is just a big free chunk for our purposes.
+         */
+        handler(m->top, m->topsize, NULL, 0, harg);
       }
-      handler(chunkptr, chunklen, userptr, userlen, harg);
-      p = next_chunk(p);
+      s = s->next;
     }
-    if (p == m->top) {
-      /* The top chunk is just a big free chunk for our purposes.
-       */
-      handler(m->top, m->topsize, NULL, 0, harg);
-    }
-    s = s->next;
+    POSTACTION(m);
   }
 }
 

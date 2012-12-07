@@ -98,6 +98,11 @@ typedef enum __ns_sect {
 	ns_s_pr = 1,		/* Update: Prerequisites. */
 	ns_s_ns = 2,		/* Query: Name servers. */
 	ns_s_ud = 2,		/* Update: Update. */
+	// BEGIN MOT ICS UPMERGE, a5111c, 11/21/2011
+	// BEGIN Motorola, w20079, 08/09/2011, IKSTABLE6-6759 negative cache support
+	ns_s_aur = 2,		/* Authority records */
+	// END Motorola, w20079, 08/09/2011, IKSTABLE6-6759 negative cache support
+	// END MOT ICS UPMERGE
 	ns_s_ar = 3,		/* Query|Update: Additional records. */
 	ns_s_max = 4
 } ns_sect;

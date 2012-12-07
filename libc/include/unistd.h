@@ -190,6 +190,8 @@ extern int cacheflush(long start, long end, long flags);
 extern pid_t tcgetpgrp(int fd);
 extern int   tcsetpgrp(int fd, pid_t _pid);
 
+extern int fallocate(int fd, int mode, off_t offset, off_t len);
+
 #if 0 /* MISSING FROM BIONIC */
 extern pid_t  getsid(pid_t);
 extern int execvpe(const char *, char * const *, char * const *);

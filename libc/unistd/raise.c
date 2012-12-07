@@ -28,7 +28,9 @@
 #include <unistd.h>
 #include <signal.h>
 
+extern int __raise(int);
+
 int raise(int signum)
 {
-    return kill(gettid(), signum);
+    return __raise(signum);
 }

@@ -71,6 +71,10 @@ typedef struct {
 static LockTable*      _lockTable;
 static pthread_once_t  _lockTable_once = PTHREAD_ONCE_INIT;
 
+void __flock_before_fork(void);
+void __flock_after_fork_parent(void);
+void __flock_after_fork_child(void);
+
 static void
 lock_table_init( void )
 {
@@ -78,6 +82,8 @@ lock_table_init( void )
     if (_lockTable != NULL) {
         pthread_mutex_init(&_lockTable->lock, NULL);
         memset(_lockTable->buckets, 0, sizeof(_lockTable->buckets));
+
+        pthread_atfork(__flock_before_fork, __flock_after_fork_parent, __flock_after_fork_child);
     }
 }
 
@@ -112,8 +118,8 @@ lock_table_lookup( LockTable*  t, FILE*  f )
     return pnode;
 }
 
-void
-flockfile(FILE * fp)
+static FileLock*
+__flockfile_get_filelock(FILE* fp)
 {
     LockTable*  t = lock_table_lock();
 
@@ -128,7 +134,7 @@ flockfile(FILE * fp)
             lock = malloc(sizeof(*lock));
             if (lock == NULL) {
                 lock_table_unlock(t);
-                return;
+                return NULL;
             }
             lock->next        = NULL;
             lock->file        = fp;
@@ -146,8 +152,17 @@ flockfile(FILE * fp)
         * the client is *really* buggy, but we don't care about
         * such code here.
         */
-        pthread_mutex_lock(&lock->mutex);
+        return lock;
     }
+    return NULL;
+}
+
+void
+flockfile(FILE * fp)
+{
+    FileLock*   lock = __flockfile_get_filelock(fp);
+    if (lock)
+        pthread_mutex_lock(&lock->mutex);
 }
 
 
@@ -155,21 +170,14 @@ int
 ftrylockfile(FILE *fp)
 {
     int         ret = -1;
-    LockTable*  t   = lock_table_lock();
+    FileLock*   lock = __flockfile_get_filelock(fp);
 
-    if (t != NULL) {
-        FileLock**  lookup = lock_table_lookup(t, fp);
-        FileLock*   lock   = *lookup;
-
-        lock_table_unlock(t);
-
-        /* see above comment about why we assume that 'lock' can
-        * be accessed from here
-        */
-        if (lock != NULL && !pthread_mutex_trylock(&lock->mutex)) {
+    if (lock) {
+        if (!pthread_mutex_trylock(&lock->mutex)) {
             ret = 0;  /* signal success */
         }
     }
+
     return ret;
 }
 
@@ -206,5 +214,40 @@ __fremovelock(FILE*  fp)
         }
         lock_table_unlock(t);
         free(lock);
+    }
+}
+
+void
+__flock_before_fork(void)
+{
+    if (_lockTable)
+        pthread_mutex_lock(&_lockTable->lock);
+}
+
+void
+__flock_after_fork_parent(void)
+{
+    if (_lockTable)
+        pthread_mutex_unlock(&_lockTable->lock);
+}
+
+void
+__flock_after_fork_child(void)
+{
+    int i;
+
+    if (_lockTable) {
+        for (i = 0; i < FILE_LOCK_BUCKETS; i++) {
+            FileLock*  node = _lockTable->buckets[i];
+            FileLock* next = node;
+            while (next) {
+                node = next->next;
+                free(next);
+                next = node;
+            }
+        }
+
+        pthread_mutex_init(&_lockTable->lock, NULL);
+        memset(_lockTable->buckets, 0, sizeof(_lockTable->buckets));
     }
 }

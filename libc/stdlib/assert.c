@@ -32,10 +32,20 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "logd.h"
+
+#define debug_log(format, ...)  \
+    __libc_android_log_print(ANDROID_LOG_DEBUG, "assert", (format), ##__VA_ARGS__ )
+#define error_log(format, ...)  \
+    __libc_android_log_print(ANDROID_LOG_ERROR, "assert", (format), ##__VA_ARGS__ )
+#define info_log(format, ...)  \
+    __libc_android_log_print(ANDROID_LOG_INFO, "assert", (format), ##__VA_ARGS__ )
 
 void
 __assert(const char *file, int line, const char *failedexpr)
 {
+	error_log("assertion \"%s\" failed: file \"%s\", line %d\n",
+	    failedexpr, file, line);
 	(void)fprintf(stderr,
 	    "assertion \"%s\" failed: file \"%s\", line %d\n",
 	    failedexpr, file, line);
@@ -46,6 +56,8 @@ __assert(const char *file, int line, const char *failedexpr)
 void
 __assert2(const char *file, int line, const char *func, const char *failedexpr)
 {
+	error_log("assertion \"%s\" failed: file \"%s\", line %d, function \"%s\"\n",
+	    failedexpr, file, line, func);
 	(void)fprintf(stderr,
 	    "assertion \"%s\" failed: file \"%s\", line %d, function \"%s\"\n",
 	    failedexpr, file, line, func);

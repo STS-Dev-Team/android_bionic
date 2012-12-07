@@ -47,9 +47,10 @@ uid_t   getuid:getuid32 ()         199
 gid_t   getgid:getgid32 ()         200
 uid_t   geteuid:geteuid32 ()       201
 gid_t   getegid:getegid32 ()       202
-uid_t   getresuid:getresuid32 ()   209
-gid_t   getresgid:getresgid32 ()   211
+uid_t   getresuid:getresuid32 (uid_t *ruid, uid_t *euid, uid_t *suid)   209
+gid_t   getresgid:getresgid32 (gid_t *rgid, gid_t *egid, gid_t *sgid)   211
 pid_t   gettid()                   224
+ssize_t readahead(int, off64_t, size_t)     225
 int     getgroups:getgroups32(int, gid_t *)    205
 pid_t   getpgid(pid_t)             132
 pid_t   getppid()		   64
@@ -63,6 +64,7 @@ void*   __brk:brk(void*)           45
 # see comments in arch-arm/bionic/kill.S to understand why we don't generate an ARM stub for kill/tkill
 int     kill(pid_t, int)           -1,37
 int     tkill(pid_t tid, int sig)  -1,238
+int     tgkill(int tgid, int tid, int sig)  -1,270,-1
 int     __ptrace:ptrace(int request, int pid, void* addr, void* data)  26
 int     __set_thread_area:set_thread_area(void*  user_desc)  -1,243
 int     __getpriority:getpriority(int, int)  96
@@ -167,7 +169,7 @@ int           nanosleep(const struct timespec *, struct timespec *)   162
 int           clock_gettime(clockid_t clk_id, struct timespec *tp)    263,265
 int           clock_settime(clockid_t clk_id, const struct timespec *tp)  262,264
 int           clock_getres(clockid_t clk_id, struct timespec *res)   264,266
-int           clock_nanosleep(const struct timespec *req, struct timespec *rem)  265,267
+int           clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *req, struct timespec *rem)  265,267
 int           getitimer(int, const struct itimerval *)   105
 int           setitimer(int, const struct itimerval *, struct itimerval *)  104
 int           __timer_create:timer_create(clockid_t clockid, struct sigevent *evp, timer_t *timerid)    257,259

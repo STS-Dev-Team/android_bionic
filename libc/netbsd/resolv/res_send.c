@@ -447,8 +447,14 @@ res_nsend(res_state statp,
 			EXT(statp).nssocks[ns] = -1;
 			if (!statp->nsaddr_list[ns].sin_family)
 				continue;
+			/* BEGIN MOT ICS UPMERGE, a5111c, 11/21/2011 */
+			/* BEGIN Motorola, IKSTABLE6-7958, 2010-08-23, IKSTABLE6-7958 */
+			if (EXT(statp).ext != NULL) {
 			EXT(statp).ext->nsaddrs[ns].sin =
 				 statp->nsaddr_list[ns];
+			}
+			/* END IKSTABLE6-7958 */
+			/* END MOT ICS UPMERGE */
 		}
 		EXT(statp).nscount = statp->nscount;
 	}

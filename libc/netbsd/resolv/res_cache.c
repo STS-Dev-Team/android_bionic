@@ -1040,6 +1040,20 @@ answer_getTTL(const void* answer, int answerlen)
                 XLOG("ns_parserr failed ancount no = %d. errno = %s\n", n, strerror(errno));
             }
         }
+        // BEGIN Motorola, w20079, 08/09/2011, IKSTABLE6-6759 negative cache support
+        if (ancount==0) {
+            int aurcount = ns_msg_count(handle, ns_s_aur);
+            for (n=0; n < aurcount; n++) {
+                if (ns_parserr(&handle, ns_s_aur, n, &rr) == 0) {
+                    if (ns_rr_type(rr) != ns_t_soa) continue;
+                    result = ns_rr_ttl(rr);
+                    break;
+                } else {
+                    XLOG("ns_parserr failed aurcount no = %d. errno = %s\n", n, strerror(errno));
+                }
+            }
+        }
+        // END Motorola, w20079, 08/09/2011, IKSTABLE6-6759 negative cache support
     } else {
         XLOG("ns_parserr failed. %s\n", strerror(errno));
     }

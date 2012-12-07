@@ -35,10 +35,16 @@ void *memrchr(const void *s, int c, size_t n)
         const char*  q = p + n;
 
         while (1) {
-            q--; if (q < p || q[0] == c) break;
-            q--; if (q < p || q[0] == c) break;
-            q--; if (q < p || q[0] == c) break;
-            q--; if (q < p || q[0] == c) break;
+
+/* simple condition "q[0] == c" is wrong here because
+ * if for example q[0] = -1 (char type) and c = 255 (c has int type)
+ * compiler will consider q[0] as int type and a result will be -1 != 255
+ * It's wrong result since standart requires comparison to be in unsighed char type.
+ * */ 
+            q--; if (q < p || q[0] == (char) c) break;
+            q--; if (q < p || q[0] == (char) c) break;
+            q--; if (q < p || q[0] == (char) c) break;
+            q--; if (q < p || q[0] == (char) c) break;
         }
         if (q >= p)
             return (void*)q;

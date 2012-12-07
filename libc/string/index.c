@@ -34,7 +34,13 @@ char *
 index(const char *p, int ch)
 {
 	for (;; ++p) {
-		if (*p == ch)
+
+/* simple condition "if (*p == ch)" is wrong here because
+ * if for example *p = -1 (*p has char type) and ch = 255 (ch has int type)
+ * compiler will consider *p as int and a result will be -1 != 255
+ * It's wrong result since standart requires comparison to be in unsighed char type.
+ * */
+		if (*p == (char) ch)
 			return((char *)p);
 		if (!*p)
 			return((char *)NULL);

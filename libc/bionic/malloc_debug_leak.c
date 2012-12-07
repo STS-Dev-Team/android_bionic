@@ -57,6 +57,11 @@
 #error MALLOC_LEAK_CHECK is not defined.
 #endif  // !MALLOC_LEAK_CHECK
 
+/*workaround if _Unwind_Backtrace can not work well */
+#ifdef __i386__
+#define UNWIND_WORKAROUND
+#endif
+
 // Global variables defined in malloc_debug_common.c
 extern int gMallocLeakZygoteChild;
 extern pthread_mutex_t gAllocationsMutex;
@@ -77,7 +82,7 @@ extern const MallocDebug* __libc_malloc_dispatch;
 
 static int gTrapOnError = 1;
 
-#define MALLOC_ALIGNMENT    8
+#define MALLOC_ALIGNMENT    16
 #define GUARD               0x48151642
 #define DEBUG               0
 
@@ -248,13 +253,84 @@ static _Unwind_Reason_Code trace_function(__unwind_context *context, void *arg)
     return _URC_END_OF_STACK;
 }
 
+#ifdef UNWIND_WORKAROUND
+#define CHECK_VALID_RETURN_ADDRESS(const_i, exit_loop, addrs, sb, st)     \
+    {                                                                     \
+        unsigned frame_addr;                                              \
+        frame_addr = (unsigned)__builtin_frame_address(const_i);          \
+        if (frame_addr <= st && frame_addr > sb)                          \
+            addrs[const_i] = (intptr_t)__builtin_return_address(const_i); \
+        else                                                              \
+            exit_loop = 1;                                                \
+    }
+#endif
+
 static inline
 int get_backtrace(intptr_t* addrs, size_t max_entries)
 {
     stack_crawl_state_t state;
     state.count = max_entries;
     state.addrs = (intptr_t*)addrs;
+
+#ifdef UNWIND_WORKAROUND
+    size_t i = 0;
+    pthread_attr_t thread_attr;
+    unsigned sb, st;
+    size_t stacksize;
+    int exit_loop = 0;
+    int entries = max_entries > 10 ? 10: max_entries;
+    pthread_t thread = pthread_self();
+
+    pthread_attr_init(&thread_attr);
+    pthread_getattr_np(thread, &thread_attr);
+    pthread_attr_getstack(&thread_attr, (void **)(&sb), &stacksize);
+    st = sb + stacksize;
+    pthread_attr_destroy(&thread_attr);
+
+    for(i = 0; i < entries && !exit_loop; i++) {
+        switch(i) {
+        case 0:
+            CHECK_VALID_RETURN_ADDRESS(0, exit_loop, addrs, sb, st);
+            break;
+        case 1:
+            CHECK_VALID_RETURN_ADDRESS(1, exit_loop, addrs, sb, st);
+            break;
+        case 2:
+            CHECK_VALID_RETURN_ADDRESS(2, exit_loop, addrs, sb, st);
+            break;
+        case 3:
+            CHECK_VALID_RETURN_ADDRESS(3, exit_loop, addrs, sb, st);
+            break;
+        case 4:
+            CHECK_VALID_RETURN_ADDRESS(4, exit_loop, addrs, sb, st);
+            break;
+        case 5:
+            CHECK_VALID_RETURN_ADDRESS(5, exit_loop, addrs, sb, st);
+            break;
+        case 6:
+            CHECK_VALID_RETURN_ADDRESS(6, exit_loop, addrs, sb, st);
+            break;
+        case 7:
+            CHECK_VALID_RETURN_ADDRESS(7, exit_loop, addrs, sb, st);
+            break;
+        case 8:
+            CHECK_VALID_RETURN_ADDRESS(8, exit_loop, addrs, sb, st);
+            break;
+        case 9:
+            CHECK_VALID_RETURN_ADDRESS(9, exit_loop, addrs, sb, st);
+            break;
+        default:
+            /* Should not got to here */
+            exit_loop = 1;
+            break;
+        }
+    }
+
+    state.count -= i;
+#else
     _Unwind_Backtrace(trace_function, (void*)&state);
+#endif // UNWIND_WORKAROUND
+
     return max_entries - state.count;
 }
 
@@ -264,11 +340,24 @@ int get_backtrace(intptr_t* addrs, size_t max_entries)
 
 #define CHK_FILL_FREE           0xef
 #define CHK_SENTINEL_VALUE      0xeb
-#define CHK_SENTINEL_HEAD_SIZE  16
+#define CHK_SENTINEL_HEAD_SIZE  0   /* to avoid alignment issue */
 #define CHK_SENTINEL_TAIL_SIZE  16
 #define CHK_OVERHEAD_SIZE       (   CHK_SENTINEL_HEAD_SIZE +    \
                                     CHK_SENTINEL_TAIL_SIZE +    \
                                     sizeof(size_t) )
+
+#define USED_BLK    0x75736564
+#define MAGIC_HEAD  0x68656164
+#define MAGIC_TAIL  0x7461696c
+
+struct mem_chk_blk {
+    int         magic_head;
+    size_t      size;
+    intptr_t    alloc_addr[8];
+    intptr_t    free_addr[8];
+    int         magic_tail;
+};
+
 
 static void dump_stack_trace()
 {
@@ -340,7 +429,7 @@ static int chk_mem_check(void*       mem,
     /* first check the bytes in the sentinel header */
     buf = (char*)mem - CHK_SENTINEL_HEAD_SIZE;
     for (i=0 ; i<CHK_SENTINEL_HEAD_SIZE ; i++) {
-        if (buf[i] != CHK_SENTINEL_VALUE) {
+        if (buf[i] != (char)CHK_SENTINEL_VALUE) {
             assert_log_message(
                 "*** %s CHECK: buffer %p "
                 "corrupted %d bytes before allocation",
@@ -356,7 +445,7 @@ static int chk_mem_check(void*       mem,
 
     buf = (char*)mem + bytes;
     for (i=CHK_SENTINEL_TAIL_SIZE-1 ; i>=0 ; i--) {
-        if (buf[i] != CHK_SENTINEL_VALUE) {
+        if (buf[i] != (char)CHK_SENTINEL_VALUE) {
             assert_log_message(
                 "*** %s CHECK: buffer %p, size=%lu, "
                 "corrupted %d bytes after allocation",
@@ -372,11 +461,22 @@ static int chk_mem_check(void*       mem,
 
 void* chk_malloc(size_t bytes)
 {
-    char* buffer = (char*)dlmalloc(bytes + CHK_OVERHEAD_SIZE);
+    char* buffer = (char*)dlmalloc(bytes + CHK_OVERHEAD_SIZE + sizeof(struct mem_chk_blk));
     if (buffer) {
         memset(buffer, CHK_SENTINEL_VALUE, bytes + CHK_OVERHEAD_SIZE);
         size_t offset = dlmalloc_usable_size(buffer) - sizeof(size_t);
         *(size_t *)(buffer + offset) = bytes;
+
+        offset = dlmalloc_usable_size(buffer) - sizeof(size_t) - sizeof(struct mem_chk_blk);
+
+        struct mem_chk_blk *mem_blk = (struct mem_chk_blk *)(buffer + offset);
+        mem_blk->magic_head = MAGIC_HEAD;
+        mem_blk->magic_tail = MAGIC_TAIL;
+        mem_blk->size = bytes;
+        pthread_mutex_lock(&gAllocationsMutex);
+        get_backtrace(&mem_blk->alloc_addr[0], 8);
+        pthread_mutex_unlock(&gAllocationsMutex);
+
         buffer += CHK_SENTINEL_HEAD_SIZE;
     }
     return buffer;
@@ -391,7 +491,18 @@ void  chk_free(void* mem)
 
         if (chk_mem_check(mem, &size, "FREE") == 0) {
             buffer = (char*)mem - CHK_SENTINEL_HEAD_SIZE;
-            memset(buffer, CHK_FILL_FREE, size + CHK_OVERHEAD_SIZE);
+            size_t offset = dlmalloc_usable_size(buffer) - sizeof(size_t) - sizeof(struct mem_chk_blk);
+            struct mem_chk_blk *mem_blk = (struct mem_chk_blk *)(buffer + offset);
+            mem_blk->magic_head = MAGIC_HEAD;
+            mem_blk->magic_tail = MAGIC_TAIL;
+            pthread_mutex_lock(&gAllocationsMutex);
+            get_backtrace(&mem_blk->free_addr[0], 8);
+            pthread_mutex_unlock(&gAllocationsMutex);
+
+            /* we don't want to mem set after free because
+             * we want to keep buffer malloc call trace.
+             */
+            memset(buffer, CHK_FILL_FREE, size + CHK_OVERHEAD_SIZE - sizeof(size_t));
             dlfree(buffer);
         }
     }

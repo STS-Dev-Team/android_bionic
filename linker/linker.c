@@ -52,7 +52,11 @@
 #include "linker_format.h"
 
 #define ALLOW_SYMBOLS_FROM_MAIN 1
-#define SO_MAX 128
+/* BEGIN MOT ICS UPMERGE, a5111c, 11/21/2011 */
+// Motorola, a22976, Jul-04-2011, IKSTABLE6-375, increase from 128 to 160
+// Motorola, mjnr67, Sep 16 2010, IKMAIN-2697 / max value is not enough for system process
+#define SO_MAX 160
+/* END MOT ICS UPMERGE */
 
 /* Assume average path length of 64 and max 8 paths */
 #define LDPATH_BUFSIZE 512
@@ -707,7 +711,11 @@ verify_elf_object(void *base, const char *name)
     if (hdr->e_ident[EI_MAG3] != ELFMAG3) return -1;
 
     /* TODO: Should we verify anything else in the header? */
-
+#ifdef ANDROID_ARM_LINKER
+    if (hdr->e_machine != EM_ARM) return -1;
+#elif defined(ANDROID_X86_LINKER)
+    if (hdr->e_machine != EM_386) return -1;
+#endif
     return 0;
 }
 
